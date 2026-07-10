@@ -7,3 +7,6 @@ export const TRUST_PLANE_ORIGIN =
 
 export const PUBLIC_SITE_ORIGIN =
   process.env.NEXT_PUBLIC_SITE_ORIGIN?.replace(/\/$/, "") || "https://supermarket.egress.live";
+
+export const AGE_CHECK_REQUEST_TYPE =
+  process.env.NEXT_PUBLIC_UNET_AGE_CHECK_REQUEST_TYPE?.trim() || "age-over-18";

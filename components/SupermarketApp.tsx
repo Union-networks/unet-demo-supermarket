@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createCheckoutVerification, pollCheckoutVerification } from "@union-networks/verification";
 import { createLoginSession, pollLoginSession } from "@union-networks/web-login";
-import { SERVICE_ID, TRUST_PLANE_ORIGIN } from "../lib/config";
+import { AGE_CHECK_REQUEST_TYPE, SERVICE_ID, TRUST_PLANE_ORIGIN } from "../lib/config";
 import type { AccountState, HostMessage, ProductRecord, SessionState } from "../lib/types";
 
 declare global {
@@ -351,7 +351,7 @@ export function SupermarketApp() {
         {
           serviceId: SERVICE_ID,
           assertionJws: session?.assertionJws || "",
-          requiredChecks: restrictedResourceIds.length ? ["age_over_18"] : [],
+          requiredChecks: restrictedResourceIds.length ? [AGE_CHECK_REQUEST_TYPE as never] : [],
           restrictedResourceIds,
           ttlSeconds: 300,
         },
