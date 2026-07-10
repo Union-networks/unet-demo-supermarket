@@ -16,8 +16,8 @@ export function GET() {
     icon: "🛒",
     origin: PUBLIC_SITE_ORIGIN,
     launchUrl: PUBLIC_SITE_ORIGIN,
-    permissions: ["identity.scoped", "attestations.request", "notifications.send"],
-    notificationCategories: ["service", "security", "marketing"],
+    permissions: ["identity.scoped", "attestations.request"],
+    notificationCategories: [],
   };
   const domainClaim = getProviderDomainClaim();
   if (domainClaim) manifest.domainClaim = domainClaim;
