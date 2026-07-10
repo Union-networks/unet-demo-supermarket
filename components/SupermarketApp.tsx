@@ -27,7 +27,7 @@ const money = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 
 function readMiniAppMode() {
   if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("miniapp") === "1";
+  return Boolean(window.ReactNativeWebView) || new URLSearchParams(window.location.search).get("miniapp") === "1";
 }
 
 function parseHostMessage(data: unknown): HostMessage | null {
@@ -187,19 +187,15 @@ export function SupermarketApp() {
   const connectMiniAppSession = useCallback(async () => {
     setMiniAppMode(true);
     setStatus("Connecting to U-net...");
-    const context = await callHost<{ scopedUserId?: string }>("host.getContext");
-    const proof = await callHost<Record<string, unknown>>("host.createMiniProgramSession");
-    const created = await api<{ scopedUserId?: string; assertionJws: string; sessionId?: string }>(
-      "/v1/demo/supermarket/miniapp-session",
-      { method: "POST", body: JSON.stringify(proof), headers: {} },
-    );
+    const created = await callHost<{ scopedUserId?: string; assertionJws?: string; sessionId?: string }>("host.createServiceSession");
+    if (!created.scopedUserId || !created.assertionJws) throw new Error("U-net host did not return a scoped service session.");
     saveSession({
-      scopedUserId: created.scopedUserId || context.scopedUserId || "",
+      scopedUserId: created.scopedUserId,
       assertionJws: created.assertionJws,
       sessionId: created.sessionId,
     });
     setStatus("Connected through the U-net app. This shop only knows your supermarket-scoped ID.");
-  }, [api, callHost, saveSession]);
+  }, [callHost, saveSession]);
 
   useEffect(() => {
     window.__unetReceiveHostMessage = (message: HostMessage) => {
