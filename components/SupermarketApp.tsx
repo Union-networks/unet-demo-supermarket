@@ -327,7 +327,11 @@ export function SupermarketApp() {
         setStatus("Confirm the over-18 checkout check in the U-net panel.");
         const result = await callHost<{ checkout?: { state?: AccountState; status?: string; failureReason?: string } }>(
           "host.requestVerification",
-          { serviceId: SERVICE_ID },
+          {
+            serviceId: SERVICE_ID,
+            requestType: AGE_CHECK_REQUEST_TYPE,
+            requestedChecks: [AGE_CHECK_REQUEST_TYPE],
+          },
         );
         if (result.checkout?.state) setState(result.checkout.state);
         else await loadState();
