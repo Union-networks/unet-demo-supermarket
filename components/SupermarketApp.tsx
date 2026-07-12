@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createCheckoutVerification, pollCheckoutVerification } from "@union-networks/verification";
 import { createLoginSession, pollLoginSession } from "@union-networks/web-login";
-import { AGE_CHECK_REQUEST_TYPE, SERVICE_ID, TRUST_PLANE_ORIGIN } from "../lib/config";
+import { SERVICE_ID, TRUST_PLANE_ORIGIN } from "../lib/config";
 import type { AccountState, HostMessage, ProductRecord, SessionState } from "../lib/types";
 
 declare global {
@@ -17,6 +17,11 @@ type PendingHostRequest = {
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
   timeout: ReturnType<typeof setTimeout>;
+};
+
+type ActiveAgeCheck = {
+  requestType: string;
+  label?: string;
 };
 
 const sessionKey = "unet.demoSupermarket.session.v2";
@@ -57,6 +62,7 @@ export function SupermarketApp() {
   const [verifyTone, setVerifyTone] = useState<"neutral" | "success" | "warning" | "error">("neutral");
   const [miniAppMode, setMiniAppMode] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [ageCheck, setAgeCheck] = useState<ActiveAgeCheck | null>(null);
   const hostSeq = useRef(0);
   const pendingHost = useRef(new Map<string, PendingHostRequest>());
 
@@ -128,6 +134,15 @@ export function SupermarketApp() {
     const body = await api<{ products: ProductRecord[] }>("/v1/demo/supermarket/products");
     setProducts(body.products || []);
   }, [api]);
+
+  const loadAgeCheck = useCallback(async () => {
+    const response = await fetch("/api/verification-checks", { cache: "no-store" });
+    const body = (await response.json().catch(() => ({}))) as { check?: ActiveAgeCheck; message?: string };
+    if (!response.ok || !body.check?.requestType) {
+      throw new Error(body.message || "No active over-18 attestation check is available.");
+    }
+    setAgeCheck(body.check);
+  }, []);
 
   const loadState = useCallback(async () => {
     if (!session?.assertionJws) return;
@@ -237,6 +252,10 @@ export function SupermarketApp() {
   }, [loadProducts]);
 
   useEffect(() => {
+    loadAgeCheck().catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
+  }, [loadAgeCheck]);
+
+  useEffect(() => {
     loadState().catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
   }, [loadState]);
 
@@ -314,6 +333,11 @@ export function SupermarketApp() {
         .map((item) => products.find((product) => product.productId === item.productId && product.requiresChecks?.length)?.productId)
         .filter((item): item is string => Boolean(item));
 
+      if (restrictedResourceIds.length && !ageCheck?.requestType) {
+        throw new Error("No active over-18 attestation check is available.");
+      }
+      const ageCheckRequestType = ageCheck?.requestType;
+
       if (miniAppMode && hasHostBridge()) {
         if (!restrictedResourceIds.length) {
           const body = await api<{ checkout?: { state?: AccountState } }>("/v1/demo/supermarket/checkout/start", {
@@ -329,8 +353,8 @@ export function SupermarketApp() {
           "host.requestVerification",
           {
             serviceId: SERVICE_ID,
-            requestType: AGE_CHECK_REQUEST_TYPE,
-            requestedChecks: [AGE_CHECK_REQUEST_TYPE],
+            requestType: ageCheckRequestType,
+            requestedChecks: [ageCheckRequestType],
           },
         );
         if (result.checkout?.state) setState(result.checkout.state);
@@ -351,7 +375,7 @@ export function SupermarketApp() {
         {
           serviceId: SERVICE_ID,
           assertionJws: session?.assertionJws || "",
-          requiredChecks: restrictedResourceIds.length ? [AGE_CHECK_REQUEST_TYPE as never] : [],
+          requiredChecks: restrictedResourceIds.length ? [ageCheckRequestType as never] : [],
           restrictedResourceIds,
           ttlSeconds: 300,
         },
