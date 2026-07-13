@@ -184,10 +184,11 @@ export function SupermarketApp() {
       await waitForHostBridge();
       return new Promise<T>((resolve, reject) => {
         const id = `supermarket-${++hostSeq.current}`;
+        const timeoutMs = action === "host.requestVerification" ? 180000 : 30000;
         const timeout = setTimeout(() => {
           pendingHost.current.delete(id);
           reject(new Error("U-net host did not respond."));
-        }, 15000);
+        }, timeoutMs);
         pendingHost.current.set(id, {
           resolve: (value) => resolve(value as T),
           reject,
