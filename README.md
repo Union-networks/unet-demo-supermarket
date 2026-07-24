@@ -44,3 +44,26 @@ The miniapp manifest is served at:
 ```
 
 The service and miniapp IDs must stay fixed as `demo-supermarket` so scoped IDs remain stable.
+
+## Domain Owner And Admin Credentials
+
+The supermarket can issue its own U-net domain Owner and Admin credentials through
+the server-only callback:
+
+```text
+https://supermarket.egress.live/api/unet/domain-admin/issue
+```
+
+Generate a separate domain-administration signer locally:
+
+```bash
+node --input-type=module -e "import { generateDomainAdminSignerEnv } from '@union-networks/issuer'; console.log(await generateDomainAdminSignerEnv({ serviceId: 'demo-supermarket' }))"
+```
+
+Store the generated `UNET_DOMAIN_ADMIN_*` values as server-only Vercel variables.
+Never prefix private-key variables with `NEXT_PUBLIC_`. Register the generated
+public keys and callback URL from the domain's Keys page in the U-net dashboard.
+
+The callback validates the domain, role, invitation challenge, and canonical
+claims before creating a holder-bound credential. Credential contents are
+encrypted to the holder before leaving the supermarket server.

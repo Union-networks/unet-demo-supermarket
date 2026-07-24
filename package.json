@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@union-networks/issuer": "0.2.0-alpha.9",
     "@union-networks/verification": "^0.2.0-alpha.2",
     "@union-networks/web-login": "^0.2.0-alpha.2",
     "next": "16.2.10",
