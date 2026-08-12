@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createCheckoutVerification, pollCheckoutVerification } from "@union-networks/verification";
 import { createLoginSession, pollLoginSession } from "@union-networks/web-login";
 import { SERVICE_ID, TRUST_PLANE_ORIGIN } from "../lib/config";
+import { PRODUCTS } from "../lib/products";
 import type { AccountState, HostMessage, ProductRecord, SessionState } from "../lib/types";
 
 declare global {
@@ -25,6 +26,7 @@ type ActiveAgeCheck = {
 };
 
 const sessionKey = "unet.demoSupermarket.session.v2";
+const stateKey = (scopedUserId: string) => `unet.demoSupermarket.state.v1.${scopedUserId}`;
 const emptyState: AccountState = { favorites: [], basket: [] };
 const sdkOptions = { issuerBaseUrl: TRUST_PLANE_ORIGIN, verifierBaseUrl: TRUST_PLANE_ORIGIN };
 
@@ -66,12 +68,6 @@ export function SupermarketApp() {
   const hostSeq = useRef(0);
   const pendingHost = useRef(new Map<string, PendingHostRequest>());
 
-  const authHeaders = useMemo(() => {
-    const headers: Record<string, string> = {};
-    if (session?.assertionJws) headers.authorization = `Bearer ${session.assertionJws}`;
-    return headers;
-  }, [session?.assertionJws]);
-
   const categories = useMemo(() => ["All", ...Array.from(new Set(products.map((product) => product.category)))], [products]);
 
   const filteredProducts = useMemo(() => {
@@ -109,31 +105,9 @@ export function SupermarketApp() {
     else window.localStorage.removeItem(sessionKey);
   }, []);
 
-  const api = useCallback(
-    async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
-      const headers = new Headers(options.headers);
-      headers.set("content-type", "application/json");
-      Object.entries(authHeaders).forEach(([key, value]) => headers.set(key, value));
-      const response = await fetch(`${TRUST_PLANE_ORIGIN}${path}`, {
-        ...options,
-        headers,
-      });
-      const body = (await response.json().catch(() => ({}))) as T & { success?: boolean; message?: string };
-      if (response.status === 401) {
-        saveSession(null);
-        setState(emptyState);
-        throw new Error("Please sign in again.");
-      }
-      if (!response.ok || body.success === false) throw new Error(body.message || "Request failed.");
-      return body;
-    },
-    [authHeaders, saveSession],
-  );
-
   const loadProducts = useCallback(async () => {
-    const body = await api<{ products: ProductRecord[] }>("/v1/demo/supermarket/products");
-    setProducts(body.products || []);
-  }, [api]);
+    setProducts(PRODUCTS);
+  }, []);
 
   const loadAgeCheck = useCallback(async () => {
     const response = await fetch("/api/verification-checks", { cache: "no-store" });
@@ -145,10 +119,18 @@ export function SupermarketApp() {
   }, []);
 
   const loadState = useCallback(async () => {
-    if (!session?.assertionJws) return;
-    const body = await api<{ state: AccountState }>("/v1/demo/supermarket/state");
-    setState(body.state || emptyState);
-  }, [api, session?.assertionJws]);
+    if (!session?.scopedUserId) return;
+    try {
+      setState(JSON.parse(window.localStorage.getItem(stateKey(session.scopedUserId)) || "null") as AccountState || emptyState);
+    } catch {
+      setState(emptyState);
+    }
+  }, [session?.scopedUserId]);
+
+  const saveAccountState = useCallback((next: AccountState) => {
+    setState(next);
+    if (session?.scopedUserId) window.localStorage.setItem(stateKey(session.scopedUserId), JSON.stringify(next));
+  }, [session?.scopedUserId]);
 
   const hasHostBridge = useCallback(
     () => Boolean(window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === "function"),
@@ -298,29 +280,19 @@ export function SupermarketApp() {
 
   const setFavorite = async (productId: string, favorite: boolean) => {
     if (!requireLogin()) return;
-    const body = await api<{ state: AccountState }>("/v1/demo/supermarket/favorites", {
-      method: "POST",
-      body: JSON.stringify({ productId, favorite }),
-    });
-    setState(body.state);
+    saveAccountState({ ...state, favorites: favorite ? Array.from(new Set([...state.favorites, productId])) : state.favorites.filter((id) => id !== productId) });
   };
 
   const setBasket = async (productId: string, quantity: number) => {
     if (!requireLogin()) return;
-    const body = await api<{ state: AccountState }>("/v1/demo/supermarket/basket", {
-      method: "POST",
-      body: JSON.stringify({ productId, quantity }),
-    });
-    setState(body.state);
+    const basket = state.basket.filter((item) => item.productId !== productId);
+    if (quantity > 0) basket.push({ productId, quantity: Math.max(0, Math.floor(quantity)) });
+    saveAccountState({ ...state, basket });
   };
 
   const clearBasket = async () => {
     if (!requireLogin()) return;
-    const body = await api<{ state: AccountState }>("/v1/demo/supermarket/basket/clear", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-    setState(body.state);
+    saveAccountState({ ...state, basket: [] });
   };
 
   const checkout = async () => {
@@ -338,19 +310,20 @@ export function SupermarketApp() {
         throw new Error("No active over-18 attestation check is available.");
       }
       const ageCheckRequestType = ageCheck?.requestType;
+      const completeCheckout = () => saveAccountState({ ...state, basket: [] });
+      const removeRestrictedItems = () => saveAccountState({
+        ...state,
+        basket: state.basket.filter((item) => !restrictedResourceIds.includes(item.productId)),
+      });
 
       if (miniAppMode && hasHostBridge()) {
         if (!restrictedResourceIds.length) {
-          const body = await api<{ checkout?: { state?: AccountState } }>("/v1/demo/supermarket/checkout/start", {
-            method: "POST",
-            body: JSON.stringify({}),
-          });
-          if (body.checkout?.state) setState(body.checkout.state);
+          completeCheckout();
           setStatus("Checkout complete. No restricted items required U-net verification.");
           return;
         }
         setStatus("Confirm the over-18 checkout check in the U-net panel.");
-        const result = await callHost<{ checkout?: { state?: AccountState; status?: string; failureReason?: string } }>(
+        const result = await callHost<{ status?: string; aggregateOutcome?: string; result?: { status?: string; aggregateOutcome?: string; reasonCode?: string } }>(
           "host.requestVerification",
           {
             serviceId: SERVICE_ID,
@@ -358,14 +331,15 @@ export function SupermarketApp() {
             requestedChecks: [ageCheckRequestType],
           },
         );
-        if (result.checkout?.state) setState(result.checkout.state);
-        else await loadState();
-        if (result.checkout?.status === "completed") {
+        const outcome = result.status ?? result.aggregateOutcome ?? result.result?.status ?? result.result?.aggregateOutcome;
+        if (outcome === "verified" || outcome === "passed" || outcome === "completed") {
+          completeCheckout();
           setStatus("Over-18 check passed. Restricted checkout was approved.");
         } else {
+          removeRestrictedItems();
           setStatus(
             `Over-18 check failed or was denied. Restricted items were removed: ${
-              result.checkout?.failureReason || result.checkout?.status || "verification_failed"
+              result.result?.reasonCode || outcome || "verification_failed"
             }`,
           );
         }
@@ -384,7 +358,7 @@ export function SupermarketApp() {
       );
 
       if (!started.requiresVerification) {
-        await loadState();
+        completeCheckout();
         setStatus("Checkout complete. No restricted items required U-net verification.");
         return;
       }
@@ -399,13 +373,14 @@ export function SupermarketApp() {
         { checkoutId: started.checkout.checkoutId, serviceId: SERVICE_ID, assertionJws: session?.assertionJws || "" },
         { ...sdkOptions, intervalMs: 1500, timeoutMs: 300000 },
       );
-      await loadState();
       if (result.checkout?.status === "completed") {
+        completeCheckout();
         setVerifyQr(null);
         setVerifyTone("success");
         setVerifyStatus("Over-18 check passed. Checkout complete.");
         setStatus("Over-18 check passed. Restricted checkout was approved.");
       } else {
+        removeRestrictedItems();
         setVerifyQr(null);
         setVerifyTone("error");
         setVerifyStatus(
@@ -415,7 +390,6 @@ export function SupermarketApp() {
         );
       }
     } catch (error) {
-      await loadState().catch(() => undefined);
       setVerifyQr(null);
       setVerifyTone("error");
       setVerifyStatus(error instanceof Error ? error.message : String(error));
