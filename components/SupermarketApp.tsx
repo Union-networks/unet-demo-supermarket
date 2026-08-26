@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createCheckoutVerification, pollCheckoutVerification } from "@union-networks/verification";
-import { createLoginSession, pollLoginSession } from "@union-networks/web-login";
-import { SERVICE_ID, TRUST_PLANE_ORIGIN } from "../lib/config";
+import QRCode from "qrcode";
+import { SERVICE_ID } from "../lib/config";
 import { PRODUCTS } from "../lib/products";
 import type { AccountState, HostMessage, ProductRecord, SessionState } from "../lib/types";
 
@@ -25,10 +24,34 @@ type ActiveAgeCheck = {
   label?: string;
 };
 
-const sessionKey = "unet.demoSupermarket.session.v2";
+const sessionKey = "unet.demoSupermarket.session.v3";
 const stateKey = (scopedUserId: string) => `unet.demoSupermarket.state.v1.${scopedUserId}`;
 const emptyState: AccountState = { favorites: [], basket: [] };
-const sdkOptions = { issuerBaseUrl: TRUST_PLANE_ORIGIN, verifierBaseUrl: TRUST_PLANE_ORIGIN };
+type CheckoutVerificationResponse = {
+  requiresVerification?: boolean;
+  checkout?: { checkoutId: string; status: string; failureReason?: string };
+  verification?: { qrDataUrl?: string };
+  message?: string;
+};
+
+const createCheckoutVerification = async (input: { requiredChecks: string[]; restrictedResourceIds: string[]; ttlSeconds: number }): Promise<CheckoutVerificationResponse> => {
+  const response = await fetch('/api/checkout-verifications', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+  const payload = await response.json().catch(() => ({})) as CheckoutVerificationResponse;
+  if (!response.ok) throw new Error(payload.message ?? `Checkout verification failed (${response.status}).`);
+  return payload;
+};
+
+const pollCheckoutVerification = async (checkoutId: string): Promise<CheckoutVerificationResponse> => {
+  const deadline = Date.now() + 300_000;
+  while (Date.now() < deadline) {
+    const response = await fetch(`/api/checkout-verifications/${encodeURIComponent(checkoutId)}`, { cache: 'no-store' });
+    const payload = await response.json().catch(() => ({})) as CheckoutVerificationResponse;
+    if (!response.ok) throw new Error(payload.message ?? `Checkout verification failed (${response.status}).`);
+    if (payload.checkout?.status !== 'pending_verification') return payload;
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+  }
+  throw new Error('Checkout verification expired.');
+};
 
 const money = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 
@@ -185,13 +208,16 @@ export function SupermarketApp() {
   const connectMiniAppSession = useCallback(async () => {
     setMiniAppMode(true);
     setStatus("Connecting to U-net...");
-    const created = await callHost<{ scopedUserId?: string; assertionJws?: string; sessionId?: string }>("host.createServiceSession");
-    if (!created.scopedUserId || !created.assertionJws) throw new Error("U-net host did not return a scoped service session.");
-    saveSession({
-      scopedUserId: created.scopedUserId,
-      assertionJws: created.assertionJws,
-      sessionId: created.sessionId,
+    const created = await callHost<{ scopedUserId?: string; sessionId?: string }>("host.createServiceSession");
+    if (!created.scopedUserId || !created.sessionId) throw new Error("U-net host did not return a provider session.");
+    const response = await fetch("/api/unet/login/exchange", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionId: created.sessionId }),
     });
+    const exchanged = await response.json().catch(() => ({})) as { success?: boolean; message?: string };
+    if (!response.ok || !exchanged.success) throw new Error(exchanged.message || "Provider session exchange failed.");
+    saveSession({ scopedUserId: created.scopedUserId, sessionId: created.sessionId });
     setStatus("Connected through the U-net app. This shop only knows your supermarket-scoped ID.");
   }, [callHost, saveSession]);
 
@@ -224,7 +250,7 @@ export function SupermarketApp() {
     setMiniAppMode(readMiniAppMode());
     try {
       const stored = JSON.parse(window.localStorage.getItem(sessionKey) || "null") as SessionState | null;
-      if (stored?.assertionJws) setSession(stored);
+      if (stored?.scopedUserId && stored.sessionId) setSession(stored);
     } catch {
       setSession(null);
     }
@@ -243,38 +269,58 @@ export function SupermarketApp() {
   }, [loadState]);
 
   useEffect(() => {
-    if (!readMiniAppMode() || session?.assertionJws) return;
+    if (!readMiniAppMode() || session?.sessionId) return;
     connectMiniAppSession()
       .then(() => loadState())
       .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
-  }, [connectMiniAppSession, loadState, session?.assertionJws]);
+  }, [connectMiniAppSession, loadState, session?.sessionId]);
 
   const requireLogin = useCallback(() => {
-    if (session?.assertionJws) return true;
+    if (session?.sessionId) return true;
     setIsLoginOpen(true);
     return false;
-  }, [session?.assertionJws]);
+  }, [session?.sessionId]);
 
   const startLogin = async () => {
     setIsLoginOpen(true);
     setLoginQr(null);
     setLoginStatus("Creating one-time QR...");
-    const created = await createLoginSession(
-      { serviceId: SERVICE_ID, origin: window.location.origin, expiresInSeconds: 120 },
-      sdkOptions,
-    );
-    if (!created.sessionId || !created.qrDataUrl) throw new Error("U-net did not return a login QR.");
-    setLoginQr(created.qrDataUrl);
+    const response = await fetch("/api/unet/login/challenge", { method: "POST" });
+    const created = await response.json().catch(() => ({})) as {
+      success?: boolean;
+      message?: string;
+      qrPayload?: string;
+      challenge?: { requestRef?: string };
+    };
+    if (!response.ok || !created.success || !created.qrPayload || !created.challenge?.requestRef) {
+      throw new Error(created.message || "The supermarket could not create a login QR.");
+    }
+    setLoginQr(await QRCode.toDataURL(created.qrPayload, { width: 320, margin: 2 }));
     setLoginStatus("Scan with U-net and approve on your phone.");
-    const result = await pollLoginSession(created.sessionId, { ...sdkOptions, intervalMs: 1500, timeoutMs: 120000 });
-    if (result.status === "approved") {
-      if (!result.scopedUserId || !result.assertionJws) throw new Error("U-net approved login without a scoped session.");
-      saveSession({ scopedUserId: result.scopedUserId, assertionJws: result.assertionJws, sessionId: result.sessionId });
+    const deadline = Date.now() + 120000;
+    let result: { state?: string; session?: { scopedUserId?: string; sessionId?: string }; message?: string } = { state: "pending" };
+    while (result.state === "pending" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const poll = await fetch(`/api/unet/login/status?requestRef=${encodeURIComponent(created.challenge.requestRef)}`, { cache: "no-store" });
+      result = await poll.json().catch(() => ({ state: "failed", message: "Could not read login status." }));
+      if (!poll.ok) throw new Error(result.message || "Could not read login status.");
+    }
+    if (result.state === "approved") {
+      const approved = result.session;
+      if (!approved?.scopedUserId || !approved.sessionId) throw new Error("Provider approved login without a scoped session.");
+      const exchangeResponse = await fetch("/api/unet/login/exchange", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId: approved.sessionId }),
+      });
+      const exchanged = await exchangeResponse.json().catch(() => ({})) as { success?: boolean; message?: string };
+      if (!exchangeResponse.ok || !exchanged.success) throw new Error(exchanged.message || "Provider session exchange failed.");
+      saveSession({ scopedUserId: approved.scopedUserId, sessionId: approved.sessionId });
       setLoginStatus("Signed in.");
       setIsLoginOpen(false);
       await loadState();
-    } else if (result.status === "denied" || result.status === "expired") {
-      setLoginStatus(result.status === "denied" ? "Login denied." : "QR expired.");
+    } else {
+      setLoginStatus(result.state === "denied" ? "Login denied." : "QR expired.");
     }
   };
 
@@ -348,13 +394,10 @@ export function SupermarketApp() {
 
       const started = await createCheckoutVerification(
         {
-          serviceId: SERVICE_ID,
-          assertionJws: session?.assertionJws || "",
           requiredChecks: restrictedResourceIds.length ? [ageCheckRequestType as never] : [],
           restrictedResourceIds,
           ttlSeconds: 300,
         },
-        sdkOptions,
       );
 
       if (!started.requiresVerification) {
@@ -369,10 +412,7 @@ export function SupermarketApp() {
       setVerifyQr(started.verification.qrDataUrl);
       setVerifyTone("warning");
       setVerifyStatus("Waiting for over-18 proof. Scan with U-net and approve on your phone.");
-      const result = await pollCheckoutVerification(
-        { checkoutId: started.checkout.checkoutId, serviceId: SERVICE_ID, assertionJws: session?.assertionJws || "" },
-        { ...sdkOptions, intervalMs: 1500, timeoutMs: 300000 },
-      );
+      const result = await pollCheckoutVerification(started.checkout.checkoutId);
       if (result.checkout?.status === "completed") {
         completeCheckout();
         setVerifyQr(null);

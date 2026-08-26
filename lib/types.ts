@@ -21,8 +21,7 @@ export type AccountState = {
 
 export type SessionState = {
   scopedUserId: string;
-  assertionJws: string;
-  sessionId?: string;
+  sessionId: string;
 };
 
 export type HostMessage = {

@@ -1,13 +1,9 @@
 # U-net Demo Supermarket
 
-Standalone demo service for U-net scoped login, miniapp launch, basket/favorite state, and checkout-bound over-18 verification.
-
-The storefront is hosted separately from the U-net web app. Trust-plane still owns the security-sensitive APIs:
-
-- scoped supermarket session creation;
-- basket and favorites storage;
-- checkout-bound holder matching;
-- age verification evaluation.
+Standalone provider for U-net Direct Login V2, miniapp launch, provider-owned
+basket/favorite state, and checkout-bound over-18 verification. The
+supermarket owns its scoped profiles, login challenges, sessions, replay
+protection, and official inbox registrations in its own Postgres database.
 
 ## Local Development
 
@@ -21,6 +17,8 @@ Useful environment variables:
 ```bash
 NEXT_PUBLIC_UNET_TRUST_PLANE_ORIGIN=https://issuer.egress.live
 NEXT_PUBLIC_SITE_ORIGIN=https://supermarket.egress.live
+UNET_PROVIDER_DATABASE_URL=postgresql://...
+UNET_PROVIDER_SESSION_SECRET=a-random-secret-with-at-least-32-characters
 ```
 
 `NEXT_PUBLIC_SITE_ORIGIN` must match the deployed origin registered for the `demo-supermarket` U-net service.
@@ -29,8 +27,8 @@ NEXT_PUBLIC_SITE_ORIGIN=https://supermarket.egress.live
 
 The app supports two modes:
 
-- Browser mode: QR login through `@union-networks/web-login`.
-- U-net miniapp mode: automatic bridge login through `host.createMiniProgramSession`.
+- Browser mode: a provider-hosted Direct Login V2 QR ceremony.
+- U-net miniapp mode: the same provider challenge through `host.createServiceSession`.
 
 Restricted checkout uses:
 
@@ -42,6 +40,29 @@ The miniapp manifest is served at:
 ```text
 /.well-known/unet-miniapp.json
 ```
+
+The Direct Login manifest is served at:
+
+```text
+/.well-known/unet-service.json
+```
+
+The supermarket can remain absent from Browse. Once its domain claim and V2
+readiness checks pass, U-net may still open it as a verified unlisted miniapp.
+
+## Domain Claim
+
+Register `https://supermarket.egress.live` through the ordinary dashboard flow
+using service ID `demo-supermarket`, then install the returned values as:
+
+```bash
+UNET_PROVIDER_CLAIM_ID=...
+UNET_PROVIDER_CLAIM_CHALLENGE=...
+UNET_PROVIDER_CLAIM_TOKEN=...
+```
+
+The deployed `/.well-known/unet-provider-claim.json` route derives the public
+proof without exposing the claim token.
 
 The service and miniapp IDs must stay fixed as `demo-supermarket` so scoped IDs remain stable.
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
+  anchorLedgerV2CredentialFromEnv,
   createCredentialEnvelopeV2,
   createDomainAdminCallbackHandler,
   encryptCredentialEnvelopeV2,
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
       serviceId: SERVICE_ID,
       origin: PUBLIC_SITE_ORIGIN,
       signer: domainAdminSigner(),
+      controlAuthorizationSecret: process.env.UNET_WEB_LOGIN_ASSERTION_SECRET,
       consumeChallenge,
       issueCredential: async (domainRequest) => {
         const signer = domainAdminSigner();
@@ -48,6 +50,15 @@ export async function POST(request: Request) {
             { path: 'valid_until', type: 'u64', value: validUntilEpoch },
           ],
         });
+        const ledgerV2 = domainRequest.version === 2
+          ? await anchorLedgerV2CredentialFromEnv({
+              issuerId: signer.issuerId,
+              attestationHash: credential.attestationCommitment,
+              holderRevocationSigner: domainRequest.holderRevocationSigner!,
+              requestId: `domain-admin-${domainRequest.invitationId}`,
+              signerEnvPrefix: 'UNET_DOMAIN_ADMIN_LEDGER',
+            })
+          : undefined;
         return {
           attestationCommitment: credential.attestationCommitment,
           encryptedCredentialEnvelope: encryptCredentialEnvelopeV2(credential, domainRequest.deliveryPublicKey) as unknown as Record<string, unknown>,
@@ -60,11 +71,17 @@ export async function POST(request: Request) {
             statusEpoch: credential.statusEpoch,
           },
           expiresAt: new Date(validUntilEpoch * 1000).toISOString(),
+          ...(ledgerV2 ? {
+            ledgerV2TransactionHash: ledgerV2.transactionHash,
+            ledgerV2IssuerIdHash: ledgerV2.issuerIdHash,
+            holderRevocationSigner: domainRequest.holderRevocationSigner,
+          } : {}),
         };
       },
     });
     const response = await handler(await request.json(), {
       'x-unet-domain-admin-challenge': request.headers.get('x-unet-domain-admin-challenge') ?? '',
+      'x-unet-control-authorization': request.headers.get('x-unet-control-authorization') ?? '',
     });
     return NextResponse.json(response);
   } catch (error) {
