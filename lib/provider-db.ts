@@ -1,6 +1,8 @@
 import { Pool } from "pg";
 
-const connectionString = process.env.UNET_PROVIDER_DATABASE_URL;
+const connectionString =
+  process.env.UNET_PROVIDER_DATABASE_URL ??
+  process.env.UNET_PROVIDER_DATABASE_DATABASE_URL;
 const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
 if (process.env.NODE_ENV === "production" && !isProductionBuild && !connectionString) {
   throw new Error("UNET_PROVIDER_DATABASE_URL is required in production");
