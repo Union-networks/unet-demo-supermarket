@@ -10,6 +10,7 @@ import {
 } from "@union-networks/server";
 import { PUBLIC_SITE_ORIGIN, SERVICE_ID } from "./config";
 import { providerPool } from "./provider-db";
+import { deleteAccountState } from "./account-state";
 
 const state = globalThis as typeof globalThis & {
   __unetSupermarketDirectLoginReady?: Promise<void>;
@@ -26,7 +27,9 @@ export async function supermarketDirectLogin() {
     origin: PUBLIC_SITE_ORIGIN,
     challengeStore: new PostgresDirectLoginChallengeStore(providerPool),
     accountStore,
-    onAccountRetired: (scopedUserId) => inboxStore.retire(scopedUserId),
+    onAccountRetired: async (scopedUserId) => {
+      await Promise.all([inboxStore.retire(scopedUserId), deleteAccountState(scopedUserId)]);
+    },
     challengeTtlSeconds: 120,
     sessionTtlSeconds: 15 * 60,
   });

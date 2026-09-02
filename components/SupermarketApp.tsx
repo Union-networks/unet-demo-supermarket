@@ -33,6 +33,17 @@ type CheckoutVerificationResponse = {
   verification?: { qrDataUrl?: string };
   message?: string;
 };
+type AccountStateResponse = {
+  success?: boolean;
+  state?: AccountState & { revision?: number; updatedAt?: string };
+  message?: string;
+};
+type AccountStateMutation =
+  | { operation: "set_favorite"; productId: string; favorite: boolean }
+  | { operation: "set_basket_quantity"; productId: string; quantity: number }
+  | { operation: "clear_basket" }
+  | { operation: "remove_basket_products"; productIds: string[] }
+  | { operation: "import_local_state_if_empty"; state: AccountState };
 
 const createCheckoutVerification = async (input: { requiredChecks: string[]; restrictedResourceIds: string[]; ttlSeconds: number }): Promise<CheckoutVerificationResponse> => {
   const response = await fetch('/api/checkout-verifications', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
@@ -90,6 +101,9 @@ export function SupermarketApp() {
   const [ageCheck, setAgeCheck] = useState<ActiveAgeCheck | null>(null);
   const hostSeq = useRef(0);
   const pendingHost = useRef(new Map<string, PendingHostRequest>());
+  const stateRef = useRef<AccountState>(emptyState);
+  const mutationSequence = useRef(0);
+  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
 
   const categories = useMemo(() => ["All", ...Array.from(new Set(products.map((product) => product.category)))], [products]);
 
@@ -141,19 +155,66 @@ export function SupermarketApp() {
     setAgeCheck(body.check);
   }, []);
 
-  const loadState = useCallback(async () => {
-    if (!session?.scopedUserId) return;
-    try {
-      setState(JSON.parse(window.localStorage.getItem(stateKey(session.scopedUserId)) || "null") as AccountState || emptyState);
-    } catch {
-      setState(emptyState);
-    }
-  }, [session?.scopedUserId]);
-
-  const saveAccountState = useCallback((next: AccountState) => {
+  const cacheAccountState = useCallback((scopedUserId: string, next: AccountState) => {
+    stateRef.current = next;
     setState(next);
-    if (session?.scopedUserId) window.localStorage.setItem(stateKey(session.scopedUserId), JSON.stringify(next));
-  }, [session?.scopedUserId]);
+    window.localStorage.setItem(stateKey(scopedUserId), JSON.stringify(next));
+  }, []);
+
+  const loadState = useCallback(async () => {
+    const scopedUserId = session?.scopedUserId;
+    if (!scopedUserId) return;
+    let cached: AccountState | null = null;
+    try {
+      cached = JSON.parse(window.localStorage.getItem(stateKey(scopedUserId)) || "null") as AccountState | null;
+      if (cached) cacheAccountState(scopedUserId, cached);
+    } catch {
+      cacheAccountState(scopedUserId, emptyState);
+    }
+    const response = await fetch("/api/account-state", { cache: "no-store" });
+    const payload = await response.json().catch(() => ({})) as AccountStateResponse;
+    if (!response.ok || !payload.success || !payload.state) throw new Error(payload.message || "Could not synchronize account state.");
+    if (
+      payload.state.revision === 0
+      && payload.state.favorites.length === 0
+      && payload.state.basket.length === 0
+      && cached
+      && (cached.favorites.length > 0 || cached.basket.length > 0)
+    ) {
+      const migrationResponse = await fetch("/api/account-state", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ operation: "import_local_state_if_empty", state: cached }),
+      });
+      const migrated = await migrationResponse.json().catch(() => ({})) as AccountStateResponse;
+      if (migrationResponse.ok && migrated.success && migrated.state) {
+        cacheAccountState(scopedUserId, migrated.state);
+        return;
+      }
+    }
+    cacheAccountState(scopedUserId, payload.state);
+  }, [cacheAccountState, session?.scopedUserId]);
+
+  const mutateState = useCallback((mutation: AccountStateMutation, optimistic: (current: AccountState) => AccountState) => {
+    const scopedUserId = session?.scopedUserId;
+    if (!scopedUserId) return;
+    const sequence = ++mutationSequence.current;
+    cacheAccountState(scopedUserId, optimistic(stateRef.current));
+    mutationQueue.current = mutationQueue.current.then(async () => {
+      const response = await fetch("/api/account-state", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(mutation),
+      });
+      const payload = await response.json().catch(() => ({})) as AccountStateResponse;
+      if (!response.ok || !payload.success || !payload.state) throw new Error(payload.message || "Could not synchronize account state.");
+      if (sequence === mutationSequence.current) cacheAccountState(scopedUserId, payload.state);
+    }).catch(async (error) => {
+      if (sequence !== mutationSequence.current) return;
+      setStatus(error instanceof Error ? error.message : "Could not synchronize account state.");
+      await loadState().catch(() => undefined);
+    });
+  }, [cacheAccountState, loadState, session?.scopedUserId]);
 
   const hasHostBridge = useCallback(
     () => Boolean(window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === "function"),
@@ -326,19 +387,25 @@ export function SupermarketApp() {
 
   const setFavorite = async (productId: string, favorite: boolean) => {
     if (!requireLogin()) return;
-    saveAccountState({ ...state, favorites: favorite ? Array.from(new Set([...state.favorites, productId])) : state.favorites.filter((id) => id !== productId) });
+    mutateState(
+      { operation: "set_favorite", productId, favorite },
+      (current) => ({ ...current, favorites: favorite ? [...new Set([...current.favorites, productId])] : current.favorites.filter((id) => id !== productId) }),
+    );
   };
 
   const setBasket = async (productId: string, quantity: number) => {
     if (!requireLogin()) return;
-    const basket = state.basket.filter((item) => item.productId !== productId);
-    if (quantity > 0) basket.push({ productId, quantity: Math.max(0, Math.floor(quantity)) });
-    saveAccountState({ ...state, basket });
+    const normalizedQuantity = Math.max(0, Math.floor(quantity));
+    mutateState({ operation: "set_basket_quantity", productId, quantity: normalizedQuantity }, (current) => {
+      const basket = current.basket.filter((item) => item.productId !== productId);
+      if (normalizedQuantity > 0) basket.push({ productId, quantity: normalizedQuantity });
+      return { ...current, basket };
+    });
   };
 
   const clearBasket = async () => {
     if (!requireLogin()) return;
-    saveAccountState({ ...state, basket: [] });
+    mutateState({ operation: "clear_basket" }, (current) => ({ ...current, basket: [] }));
   };
 
   const checkout = async () => {
@@ -356,11 +423,11 @@ export function SupermarketApp() {
         throw new Error("No active over-18 attestation check is available.");
       }
       const ageCheckRequestType = ageCheck?.requestType;
-      const completeCheckout = () => saveAccountState({ ...state, basket: [] });
-      const removeRestrictedItems = () => saveAccountState({
-        ...state,
-        basket: state.basket.filter((item) => !restrictedResourceIds.includes(item.productId)),
-      });
+      const completeCheckout = () => mutateState({ operation: "clear_basket" }, (current) => ({ ...current, basket: [] }));
+      const removeRestrictedItems = () => mutateState(
+        { operation: "remove_basket_products", productIds: restrictedResourceIds },
+        (current) => ({ ...current, basket: current.basket.filter((item) => !restrictedResourceIds.includes(item.productId)) }),
+      );
 
       if (miniAppMode && hasHostBridge()) {
         if (!restrictedResourceIds.length) {
