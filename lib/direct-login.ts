@@ -7,7 +7,7 @@ import {
   ensureOfficialMessagingInboxSchema,
   registerOfficialMessagingInbox,
   type OfficialMessagingInboxRegistration,
-} from "@union-networks/server";
+} from "@u-net/server";
 import { PUBLIC_SITE_ORIGIN, SERVICE_ID } from "./config";
 import { providerPool } from "./provider-db";
 import { deleteAccountState } from "./account-state";

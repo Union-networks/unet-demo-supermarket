@@ -1,4 +1,4 @@
-import { createDomainAdminSignerFromEnv } from '@union-networks/issuer';
+import { createDomainAdminSignerFromEnv } from '@u-net/issuer';
 import { createPrivateKey } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

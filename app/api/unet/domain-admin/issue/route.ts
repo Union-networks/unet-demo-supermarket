@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import {
   anchorLedgerV2CredentialFromEnv,
   createCredentialEnvelopeV2,
-  createDomainAdminCallbackHandler,
+  createDomainAdminCallbackHandlerV2,
   encryptCredentialEnvelopeV2,
-} from '@union-networks/issuer';
+} from '@u-net/issuer';
 import { PUBLIC_SITE_ORIGIN, SERVICE_ID } from '../../../../../lib/config';
 import { configureCredentialRuntime, domainAdminSigner } from '../../../../../lib/domain-admin-issuer';
+import { domainAdminControlAuthorization } from '../../../../../lib/control-authorization';
 
 export const runtime = 'nodejs';
 
@@ -22,11 +23,13 @@ const consumeChallenge = async (challenge: string): Promise<boolean> => {
 export async function POST(request: Request) {
   try {
     configureCredentialRuntime();
-    const handler = createDomainAdminCallbackHandler({
+    const control = await domainAdminControlAuthorization();
+    const handler = createDomainAdminCallbackHandlerV2({
       serviceId: SERVICE_ID,
       origin: PUBLIC_SITE_ORIGIN,
       signer: domainAdminSigner(),
-      controlAuthorizationSecret: process.env.UNET_WEB_LOGIN_ASSERTION_SECRET,
+      controlPublicKeys: control.publicKeys,
+      consumeControlNonce: control.consumeNonce,
       consumeChallenge,
       issueCredential: async (domainRequest) => {
         const signer = domainAdminSigner();

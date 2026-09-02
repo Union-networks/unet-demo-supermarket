@@ -1,8 +1,9 @@
 import { sign } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { revokeLedgerV2CredentialFromEnv, verifyDomainAdminControlAuthorization } from '@union-networks/issuer';
+import { revokeLedgerV2CredentialFromEnv } from '@u-net/issuer';
 import { SERVICE_ID } from '../../../../../lib/config';
 import { configureCredentialRuntime, domainAdminSigner } from '../../../../../lib/domain-admin-issuer';
+import { verifyControlAuthorization } from '../../../../../lib/control-authorization';
 
 export const runtime = 'nodejs';
 
@@ -36,7 +37,12 @@ export async function POST(request: Request) {
     if (!body.challenge || body.challenge !== challengeHeader || consumedChallenges.has(body.challenge)) throw new Error('domain_admin_challenge_invalid');
     if (!body.expiresAt || Date.parse(body.expiresAt) <= Date.now()) throw new Error('domain_admin_callback_expired');
     if (!/^[a-f0-9]{64}$/i.test(body.attestationHash ?? '') || !body.requestId || !body.reason) throw new Error('domain_admin_callback_invalid');
-    if (!verifyDomainAdminControlAuthorization(body, request.headers.get('x-unet-control-authorization') ?? undefined, process.env.UNET_WEB_LOGIN_ASSERTION_SECRET ?? '')) throw new Error('domain_admin_control_authorization_invalid');
+    if (!(await verifyControlAuthorization({
+      body,
+      authorization: request.headers.get('x-unet-control-authorization') ?? undefined,
+      path: '/api/unet/domain-admin/revoke',
+      audience: SERVICE_ID,
+    }))) throw new Error('domain_admin_control_authorization_invalid');
     consumedChallenges.add(body.challenge);
     if (consumedChallenges.size > 1000) consumedChallenges.delete(consumedChallenges.values().next().value!);
     const ledgerV2 = await revokeLedgerV2CredentialFromEnv({

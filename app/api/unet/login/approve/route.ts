@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { DirectLoginApproval } from "@union-networks/server";
+import type { DirectLoginApproval } from "@u-net/server";
 import { supermarketDirectLogin } from "../../../../../lib/direct-login";
 
 export async function POST(request: Request) {

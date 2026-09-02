@@ -32,7 +32,7 @@ The app supports two modes:
 
 Restricted checkout uses:
 
-- Browser mode: checkout-bound verification QR through `@union-networks/verification`.
+- Browser mode: checkout-bound verification QR through `@u-net/verification`.
 - U-net miniapp mode: native `host.requestVerification`, which opens the app's holder-controlled verification panel.
 
 The miniapp manifest is served at:
@@ -78,7 +78,7 @@ https://supermarket.egress.live/api/unet/domain-admin/issue
 Generate a separate domain-administration signer locally:
 
 ```bash
-node --input-type=module -e "import { generateDomainAdminSignerEnv } from '@union-networks/issuer'; console.log(await generateDomainAdminSignerEnv({ serviceId: 'demo-supermarket' }))"
+node --input-type=module -e "import { generateDomainAdminSignerEnv } from '@u-net/issuer'; console.log(await generateDomainAdminSignerEnv({ serviceId: 'demo-supermarket' }))"
 ```
 
 Store the generated `UNET_DOMAIN_ADMIN_*` values as server-only Vercel variables.

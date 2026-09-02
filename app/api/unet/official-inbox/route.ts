@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { OfficialMessagingInboxRegistration } from "@union-networks/server";
+import type { OfficialMessagingInboxRegistration } from "@u-net/server";
 import { registerSupermarketOfficialInbox } from "../../../../lib/direct-login";
 
 export async function POST(request: Request) {

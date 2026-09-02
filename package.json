@@ -9,8 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@union-networks/issuer": "0.2.0-alpha.24",
-    "@union-networks/server": "0.2.0-alpha.17",
+    "@u-net/issuer": "1.0.0-rc.2",
+    "@u-net/server": "1.0.0-rc.2",
     "next": "16.2.10",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
