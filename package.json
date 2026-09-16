@@ -2,15 +2,18 @@
   "name": "unet-demo-supermarket",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@u-net/issuer": "1.0.0",
-    "@u-net/server": "1.0.0",
+    "@u-net/issuer": "2.0.0-rc.2",
+    "@u-net/server": "2.0.0-rc.2",
     "next": "16.2.10",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
@@ -25,6 +28,7 @@
     "@types/react-dom": "^19.0.3",
     "eslint": "^9.18.0",
     "eslint-config-next": "16.2.10",
+    "tsx": "^4.20.6",
     "typescript": "^5.7.3"
   }
 }

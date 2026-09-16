@@ -10,7 +10,8 @@ import {
 } from "@u-net/server";
 import { PUBLIC_SITE_ORIGIN, SERVICE_ID } from "./config";
 import { providerPool } from "./provider-db";
-import { deleteAccountState } from "./account-state";
+import { supermarketLoginWebHandlers } from "./login-web";
+import { cleanupSupermarketRetirement } from "./retirement-cleanup";
 
 const state = globalThis as typeof globalThis & {
   __unetSupermarketDirectLoginReady?: Promise<void>;
@@ -18,7 +19,10 @@ const state = globalThis as typeof globalThis & {
 };
 
 export async function supermarketDirectLogin() {
-  state.__unetSupermarketDirectLoginReady ??= ensureDirectLoginSchema(providerPool).then(() => ensureOfficialMessagingInboxSchema(providerPool));
+  state.__unetSupermarketDirectLoginReady ??= ensureDirectLoginSchema(providerPool).then(() => ensureOfficialMessagingInboxSchema(providerPool)).catch((error) => {
+    state.__unetSupermarketDirectLoginReady = undefined;
+    throw error;
+  });
   await state.__unetSupermarketDirectLoginReady;
   const accountStore = new PostgresDirectLoginAccountStore(providerPool);
   const inboxStore = new PostgresOfficialMessagingInboxStore(providerPool);
@@ -27,13 +31,16 @@ export async function supermarketDirectLogin() {
     origin: PUBLIC_SITE_ORIGIN,
     challengeStore: new PostgresDirectLoginChallengeStore(providerPool),
     accountStore,
-    onAccountRetired: async (scopedUserId) => {
-      await Promise.all([inboxStore.retire(scopedUserId), deleteAccountState(scopedUserId)]);
-    },
+    onAccountRetired: (scopedUserId, operationId, signal) =>
+      cleanupSupermarketRetirement(scopedUserId, operationId, signal, inboxStore),
     challengeTtlSeconds: 120,
     sessionTtlSeconds: 15 * 60,
   });
   return state.__unetSupermarketDirectLogin;
+}
+
+export async function supermarketLoginHandlers() {
+  return supermarketLoginWebHandlers(await supermarketDirectLogin(), new PostgresDirectLoginAccountStore(providerPool));
 }
 
 export async function registerSupermarketOfficialInbox(registration: OfficialMessagingInboxRegistration) {

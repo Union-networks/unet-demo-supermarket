@@ -50,19 +50,27 @@ export async function ensureAccountStateSchema(): Promise<void> {
       revision BIGINT NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
-  `).then(() => undefined);
+  `).then(() => undefined).catch((error) => {
+    runtime.__unetSupermarketAccountStateReady = undefined;
+    throw error;
+  });
   await runtime.__unetSupermarketAccountStateReady;
 }
 
 export async function getAccountState(scopedUserId: string): Promise<VersionedAccountState> {
   await ensureAccountStateSchema();
   const result = await providerPool.query(
-    `INSERT INTO supermarket_account_states_v2 (scoped_user_id)
-     VALUES ($1)
+    `WITH active AS MATERIALIZED (
+       SELECT scoped_user_id FROM unet_service_accounts_v2
+        WHERE scoped_user_id=$1 AND status='active' FOR SHARE
+     )
+     INSERT INTO supermarket_account_states_v2 (scoped_user_id)
+     SELECT scoped_user_id FROM active
      ON CONFLICT (scoped_user_id) DO UPDATE SET scoped_user_id=EXCLUDED.scoped_user_id
      RETURNING favorites,basket,revision,updated_at`,
     [scopedUserId],
   );
+  if (!result.rows[0]) throw new Error('service_account_retired');
   return mapRow(result.rows[0]);
 }
 
@@ -71,6 +79,12 @@ export async function mutateAccountState(scopedUserId: string, mutation: Account
   const client = await providerPool.connect();
   try {
     await client.query("BEGIN");
+    // Serialize writes with retirement so an in-flight request cannot recreate cleaned state.
+    const active = await client.query(
+      "SELECT 1 FROM unet_service_accounts_v2 WHERE scoped_user_id=$1 AND status='active' FOR SHARE",
+      [scopedUserId],
+    );
+    if (!active.rows.length) throw new Error('service_account_retired');
     await client.query(
       `INSERT INTO supermarket_account_states_v2 (scoped_user_id) VALUES ($1)
        ON CONFLICT (scoped_user_id) DO NOTHING`,

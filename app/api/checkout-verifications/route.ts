@@ -7,7 +7,7 @@ import { SERVICE_ID, VERIFIER_ORIGIN } from '../../../lib/config';
 type VerificationCheck = Record<string, unknown> & { requestType?: string };
 
 export async function POST(request: Request) {
-  const principal = readProviderSession(request);
+  const principal = await readProviderSession(request);
   if (!principal) return NextResponse.json({ success: false, message: 'login_required' }, { status: 401 });
   const body = await request.json().catch(() => ({})) as { requiredChecks?: string[]; restrictedResourceIds?: string[]; ttlSeconds?: number };
   const requiredChecks = Array.isArray(body.requiredChecks) ? [...new Set(body.requiredChecks.map(String).filter(Boolean))].slice(0, 8) : [];

@@ -5,14 +5,19 @@ import { readProviderSession } from "../../../lib/provider-session";
 const unauthorized = () => NextResponse.json({ success: false, message: "login_required" }, { status: 401 });
 
 export async function GET(request: Request) {
-  const principal = readProviderSession(request);
+  const principal = await readProviderSession(request);
   if (!principal) return unauthorized();
-  const state = await getAccountState(principal.scopedUserId);
-  return NextResponse.json({ success: true, state }, { headers: { "cache-control": "private, no-store" } });
+  try {
+    const state = await getAccountState(principal.scopedUserId);
+    return NextResponse.json({ success: true, state }, { headers: { "cache-control": "private, no-store" } });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'service_account_retired') return unauthorized();
+    return NextResponse.json({ success: false, message: 'account_state_unavailable' }, { status: 503 });
+  }
 }
 
 export async function PATCH(request: Request) {
-  const principal = readProviderSession(request);
+  const principal = await readProviderSession(request);
   if (!principal) return unauthorized();
   const body = await request.json().catch(() => null) as AccountStateMutation | null;
   if (!body || !["set_favorite", "set_basket_quantity", "clear_basket", "remove_basket_products", "import_local_state_if_empty"].includes(body.operation)) {
@@ -23,6 +28,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true, state }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "account_state_update_failed";
+    if (message === 'service_account_retired') return unauthorized();
     return NextResponse.json({ success: false, message }, { status: message === "unknown_product" ? 400 : 500 });
   }
 }

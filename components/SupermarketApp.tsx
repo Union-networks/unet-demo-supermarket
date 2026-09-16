@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { createProviderChallenge, exchangeProviderChallenge, loginQrPayload } from "../lib/browser-login";
 import { SERVICE_ID } from "../lib/config";
 import { PRODUCTS } from "../lib/products";
 import type { AccountState, HostMessage, ProductRecord, SessionState } from "../lib/types";
@@ -104,6 +105,8 @@ export function SupermarketApp() {
   const stateRef = useRef<AccountState>(emptyState);
   const mutationSequence = useRef(0);
   const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+  const miniAppAttempted = useRef(false);
+  const loginAttempt = useRef(0);
 
   const categories = useMemo(() => ["All", ...Array.from(new Set(products.map((product) => product.category)))], [products]);
 
@@ -138,8 +141,7 @@ export function SupermarketApp() {
 
   const saveSession = useCallback((next: SessionState | null) => {
     setSession(next);
-    if (next) window.localStorage.setItem(sessionKey, JSON.stringify(next));
-    else window.localStorage.removeItem(sessionKey);
+    window.localStorage.removeItem(sessionKey);
   }, []);
 
   const loadProducts = useCallback(async () => {
@@ -173,6 +175,7 @@ export function SupermarketApp() {
     }
     const response = await fetch("/api/account-state", { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as AccountStateResponse;
+    if (response.status === 401) { saveSession(null); setState(emptyState); return; }
     if (!response.ok || !payload.success || !payload.state) throw new Error(payload.message || "Could not synchronize account state.");
     if (
       payload.state.revision === 0
@@ -193,7 +196,7 @@ export function SupermarketApp() {
       }
     }
     cacheAccountState(scopedUserId, payload.state);
-  }, [cacheAccountState, session?.scopedUserId]);
+  }, [cacheAccountState, saveSession, session?.scopedUserId]);
 
   const mutateState = useCallback((mutation: AccountStateMutation, optimistic: (current: AccountState) => AccountState) => {
     const scopedUserId = session?.scopedUserId;
@@ -269,16 +272,16 @@ export function SupermarketApp() {
   const connectMiniAppSession = useCallback(async () => {
     setMiniAppMode(true);
     setStatus("Connecting to U-net...");
-    const created = await callHost<{ scopedUserId?: string; sessionId?: string }>("host.createServiceSession");
-    if (!created.scopedUserId || !created.sessionId) throw new Error("U-net host did not return a provider session.");
-    const response = await fetch("/api/unet/login/exchange", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sessionId: created.sessionId }),
-    });
-    const exchanged = await response.json().catch(() => ({})) as { success?: boolean; message?: string };
-    if (!response.ok || !exchanged.success) throw new Error(exchanged.message || "Provider session exchange failed.");
-    saveSession({ scopedUserId: created.scopedUserId, sessionId: created.sessionId });
+    const challenge = await createProviderChallenge();
+    const approved = await callHost<{ requestRef?: string; approved?: boolean; scopedUserId?: string }>(
+      "host.createServiceSession", { requestRef: challenge.requestRef },
+    );
+    if (approved.approved !== true || approved.requestRef !== challenge.requestRef || !approved.scopedUserId) {
+      throw new Error("U-net host did not approve this login challenge.");
+    }
+    const exchanged = await exchangeProviderChallenge(challenge.requestRef);
+    if (exchanged.scopedUserId !== approved.scopedUserId) throw new Error("U-net login account mismatch.");
+    saveSession(exchanged);
     setStatus("Connected through the U-net app. This shop only knows your supermarket-scoped ID.");
   }, [callHost, saveSession]);
 
@@ -309,13 +312,15 @@ export function SupermarketApp() {
 
   useEffect(() => {
     setMiniAppMode(readMiniAppMode());
-    try {
-      const stored = JSON.parse(window.localStorage.getItem(sessionKey) || "null") as SessionState | null;
-      if (stored?.scopedUserId && stored.sessionId) setSession(stored);
-    } catch {
-      setSession(null);
-    }
-  }, []);
+    window.localStorage.removeItem(sessionKey);
+    if (readMiniAppMode()) return;
+    let cancelled = false;
+    void fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' }).then(async (response) => {
+      const value = await response.json();
+      if (!cancelled && response.ok && value.scopedUserId) saveSession({ scopedUserId: value.scopedUserId });
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [saveSession]);
 
   useEffect(() => {
     loadProducts().catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
@@ -330,53 +335,43 @@ export function SupermarketApp() {
   }, [loadState]);
 
   useEffect(() => {
-    if (!readMiniAppMode() || session?.sessionId) return;
+    if (!readMiniAppMode() || session?.scopedUserId || miniAppAttempted.current) return;
+    miniAppAttempted.current = true;
     connectMiniAppSession()
       .then(() => loadState())
       .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
-  }, [connectMiniAppSession, loadState, session?.sessionId]);
+  }, [connectMiniAppSession, loadState, session?.scopedUserId]);
 
   const requireLogin = useCallback(() => {
-    if (session?.sessionId) return true;
+    if (session?.scopedUserId) return true;
     setIsLoginOpen(true);
     return false;
-  }, [session?.sessionId]);
+  }, [session?.scopedUserId]);
 
   const startLogin = async () => {
+    if (readMiniAppMode()) { await connectMiniAppSession(); return; }
+    const attempt = ++loginAttempt.current;
     setIsLoginOpen(true);
     setLoginQr(null);
     setLoginStatus("Creating one-time QR...");
-    const response = await fetch("/api/unet/login/challenge", { method: "POST" });
-    const created = await response.json().catch(() => ({})) as {
-      success?: boolean;
-      message?: string;
-      qrPayload?: string;
-      challenge?: { requestRef?: string };
-    };
-    if (!response.ok || !created.success || !created.qrPayload || !created.challenge?.requestRef) {
-      throw new Error(created.message || "The supermarket could not create a login QR.");
-    }
-    setLoginQr(await QRCode.toDataURL(created.qrPayload, { width: 320, margin: 2 }));
+    const challenge = await createProviderChallenge();
+    const qr = await QRCode.toDataURL(loginQrPayload(challenge), { width: 320, margin: 2 });
+    if (attempt !== loginAttempt.current) return;
+    setLoginQr(qr);
     setLoginStatus("Scan with U-net and approve on your phone.");
     const deadline = Date.now() + 120000;
-    let result: { state?: string; session?: { scopedUserId?: string; sessionId?: string }; message?: string } = { state: "pending" };
+    let result: { state?: string; error?: string; message?: string } = { state: "pending" };
     while (result.state === "pending" && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      const poll = await fetch(`/api/unet/login/status?requestRef=${encodeURIComponent(created.challenge.requestRef)}`, { cache: "no-store" });
+      if (attempt !== loginAttempt.current) return;
+      const poll = await fetch(`/api/unet/login/status?requestRef=${encodeURIComponent(challenge.requestRef)}`, { credentials: 'same-origin', cache: "no-store" });
       result = await poll.json().catch(() => ({ state: "failed", message: "Could not read login status." }));
-      if (!poll.ok) throw new Error(result.message || "Could not read login status.");
+      if (!poll.ok) throw new Error(result.error || result.message || "Could not read login status.");
     }
+    if (attempt !== loginAttempt.current) return;
     if (result.state === "approved") {
-      const approved = result.session;
-      if (!approved?.scopedUserId || !approved.sessionId) throw new Error("Provider approved login without a scoped session.");
-      const exchangeResponse = await fetch("/api/unet/login/exchange", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId: approved.sessionId }),
-      });
-      const exchanged = await exchangeResponse.json().catch(() => ({})) as { success?: boolean; message?: string };
-      if (!exchangeResponse.ok || !exchanged.success) throw new Error(exchanged.message || "Provider session exchange failed.");
-      saveSession({ scopedUserId: approved.scopedUserId, sessionId: approved.sessionId });
+      const exchanged = await exchangeProviderChallenge(challenge.requestRef);
+      saveSession(exchanged);
       setLoginStatus("Signed in.");
       setIsLoginOpen(false);
       await loadState();
@@ -505,7 +500,10 @@ export function SupermarketApp() {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const response = await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' });
+    if (!response.ok) { setStatus('Could not sign out.'); return; }
+    loginAttempt.current += 1;
     saveSession(null);
     setState(emptyState);
     setStatus("Sign in to favorite items and use your basket.");
@@ -656,7 +654,7 @@ export function SupermarketApp() {
           <section className="modal">
             <div className="product-row">
               <strong>Sign in with U-net</strong>
-              <button className="secondary" onClick={() => setIsLoginOpen(false)}>
+              <button className="secondary" onClick={() => { loginAttempt.current += 1; setIsLoginOpen(false); }}>
                 Close
               </button>
             </div>

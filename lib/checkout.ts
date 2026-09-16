@@ -30,7 +30,7 @@ export function ensureCheckoutSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS supermarket_checkout_owner_idx ON supermarket_checkout_verifications_v2(scoped_user_id,created_at DESC);
-  `).then(() => undefined);
+  `).then(() => undefined).catch((error) => { ready = undefined; throw error; });
   return ready;
 }
 
@@ -50,12 +50,17 @@ export async function createCheckout(input: Omit<ProviderCheckout, 'checkoutId'>
   await ensureCheckoutSchema();
   const checkoutId = `checkout_${randomBytes(18).toString('base64url')}`;
   const result = await providerPool.query(
-    `INSERT INTO supermarket_checkout_verifications_v2(
+    `WITH active AS MATERIALIZED (
+       SELECT scoped_user_id FROM unet_service_accounts_v2
+        WHERE scoped_user_id=$2 AND status='active' FOR SHARE
+     )
+     INSERT INTO supermarket_checkout_verifications_v2(
        checkout_id,scoped_user_id,status,required_checks,restricted_resource_ids,
        verification_session_id,verification_session_ref,failure_reason,expires_at)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+     SELECT $1,scoped_user_id,$3,$4,$5,$6,$7,$8,$9 FROM active RETURNING *`,
     [checkoutId, input.scopedUserId, input.status, input.requiredChecks, input.restrictedResourceIds, input.verificationSessionId ?? null, input.verificationSessionRef ?? null, input.failureReason ?? null, input.expiresAt ?? null],
   );
+  if (!result.rows[0]) throw new Error('service_account_retired');
   return fromRow(result.rows[0]);
 }
 
@@ -67,8 +72,19 @@ export async function getCheckout(checkoutId: string, scopedUserId: string) {
 
 export async function updateCheckout(checkoutId: string, status: ProviderCheckout['status'], failureReason?: string) {
   const result = await providerPool.query(
-    'UPDATE supermarket_checkout_verifications_v2 SET status=$2,failure_reason=$3,updated_at=now() WHERE checkout_id=$1 RETURNING *',
+    `WITH active AS MATERIALIZED (
+       SELECT account.scoped_user_id FROM unet_service_accounts_v2 account
+         JOIN supermarket_checkout_verifications_v2 checkout ON checkout.scoped_user_id=account.scoped_user_id
+        WHERE checkout.checkout_id=$1 AND account.status='active' FOR SHARE OF account
+     )
+     UPDATE supermarket_checkout_verifications_v2 SET status=$2,failure_reason=$3,updated_at=now()
+      WHERE checkout_id=$1 AND scoped_user_id IN (SELECT scoped_user_id FROM active) RETURNING *`,
     [checkoutId, status, failureReason ?? null],
   );
   return result.rows[0] ? fromRow(result.rows[0]) : undefined;
+}
+
+export async function deleteCheckoutState(scopedUserId: string): Promise<void> {
+  await ensureCheckoutSchema();
+  await providerPool.query('DELETE FROM supermarket_checkout_verifications_v2 WHERE scoped_user_id=$1', [scopedUserId]);
 }

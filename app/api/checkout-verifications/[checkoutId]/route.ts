@@ -4,7 +4,7 @@ import { readProviderSession } from '../../../../lib/provider-session';
 import { VERIFIER_ORIGIN } from '../../../../lib/config';
 
 export async function GET(request: Request, context: { params: Promise<{ checkoutId: string }> }) {
-  const principal = readProviderSession(request);
+  const principal = await readProviderSession(request);
   if (!principal) return NextResponse.json({ success: false, message: 'login_required' }, { status: 401 });
   const { checkoutId } = await context.params;
   let checkout = await getCheckout(checkoutId, principal.scopedUserId);
