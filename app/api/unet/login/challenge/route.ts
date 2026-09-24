@@ -1,9 +1,10 @@
 import { supermarketLoginHandlers } from '../../../../../lib/direct-login';
+import { runProviderRoute } from '../../../../../lib/provider-route';
 
 export async function POST(request: Request) {
-  return (await supermarketLoginHandlers()).challenge(request);
+  return runProviderRoute('login_challenge', async () => (await supermarketLoginHandlers()).challenge(request));
 }
 
 export async function GET(request: Request) {
-  return (await supermarketLoginHandlers()).challengeDetails(request);
+  return runProviderRoute('login_challenge_details', async () => (await supermarketLoginHandlers()).challengeDetails(request));
 }
