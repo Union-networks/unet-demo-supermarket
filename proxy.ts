@@ -7,4 +7,4 @@ export function proxy() {
   });
 }
 
-export const config = { matcher: ['/api/unet/login/:path*'] };
+export const config = { matcher: ['/api/unet/login/:path*', '/api/unet/domain-admin/issue', '/api/unet/domain-admin/revoke'] };
