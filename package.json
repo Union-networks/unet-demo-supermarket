@@ -12,8 +12,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@u-net/issuer": "2.0.0-rc.2",
-    "@u-net/server": "2.0.0-rc.2",
+    "@u-net/issuer": "2.0.0-rc.3",
+    "@u-net/server": "2.0.0-rc.3",
     "next": "16.2.10",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",

@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { privateJson, privateFailure, readPrivateBody } from '../../../../../lib/private-route-response';
 import {
   anchorLedgerV2CredentialFromEnv,
   createCredentialEnvelopeV2,
   createDomainAdminCallbackHandlerV2,
   encryptCredentialEnvelopeV2,
+  validateDomainAdminCallbackRequest,
 } from '@u-net/issuer';
 import { PUBLIC_SITE_ORIGIN, SERVICE_ID } from '../../../../../lib/config';
 import { configureCredentialRuntime, domainAdminSigner } from '../../../../../lib/domain-admin-issuer';
@@ -22,16 +23,30 @@ const consumeChallenge = async (challenge: string): Promise<boolean> => {
 
 export async function POST(request: Request) {
   try {
-    configureCredentialRuntime();
+    const body = await readPrivateBody<Record<string, unknown>>(request);
+    if (body.version === 1) throw new Error('protocol_upgrade_required');
+    if (body.version !== 2) throw new Error('domain_admin_callback_action_invalid');
+    const challenge = request.headers.get('x-unet-domain-admin-challenge') ?? '';
+    if (challenge.includes(',')) throw new Error('domain_admin_challenge_invalid');
+    if (typeof body.expiresAt !== 'string' || !Number.isFinite(Date.parse(body.expiresAt))) throw new Error('domain_admin_invitation_expired');
+    validateDomainAdminCallbackRequest(body, { serviceId: SERVICE_ID, origin: PUBLIC_SITE_ORIGIN, challengeHeader: challenge });
+    const authorization = request.headers.get('x-unet-control-authorization') ?? '';
+    if (!/^v2\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(authorization)) throw new Error('domain_admin_control_authorization_invalid');
     const control = await domainAdminControlAuthorization();
     const handler = createDomainAdminCallbackHandlerV2({
       serviceId: SERVICE_ID,
       origin: PUBLIC_SITE_ORIGIN,
-      signer: domainAdminSigner(),
+      // Installed adapters copy options before authentication; defer key access until signing.
+      signer: {
+        get issuerId() { return domainAdminSigner().issuerId; },
+        get keyId() { return domainAdminSigner().keyId; },
+        get privateKeyPem() { return domainAdminSigner().privateKeyPem; },
+      },
       controlPublicKeys: control.publicKeys,
       consumeControlNonce: control.consumeNonce,
       consumeChallenge,
       issueCredential: async (domainRequest) => {
+        configureCredentialRuntime();
         const signer = domainAdminSigner();
         const nowEpoch = Math.floor(Date.now() / 1000);
         const validUntilEpoch = nowEpoch + 2 * 365 * 24 * 60 * 60;
@@ -53,15 +68,13 @@ export async function POST(request: Request) {
             { path: 'valid_until', type: 'u64', value: validUntilEpoch },
           ],
         });
-        const ledgerV2 = domainRequest.version === 2
-          ? await anchorLedgerV2CredentialFromEnv({
+        const ledgerV2 = await anchorLedgerV2CredentialFromEnv({
               issuerId: signer.issuerId,
               attestationHash: credential.attestationCommitment,
               holderRevocationSigner: domainRequest.holderRevocationSigner!,
               requestId: `domain-admin-${domainRequest.invitationId}`,
               signerEnvPrefix: 'UNET_DOMAIN_ADMIN_LEDGER',
-            })
-          : undefined;
+            });
         return {
           attestationCommitment: credential.attestationCommitment,
           encryptedCredentialEnvelope: encryptCredentialEnvelopeV2(credential, domainRequest.deliveryPublicKey) as unknown as Record<string, unknown>,
@@ -82,13 +95,12 @@ export async function POST(request: Request) {
         };
       },
     });
-    const response = await handler(await request.json(), {
+    const response = await handler(body, {
       'x-unet-domain-admin-challenge': request.headers.get('x-unet-domain-admin-challenge') ?? '',
       'x-unet-control-authorization': request.headers.get('x-unet-control-authorization') ?? '',
     });
-    return NextResponse.json(response);
+    return privateJson(response);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'domain_admin_issue_failed';
-    return NextResponse.json({ success: false, errorCode: message, message }, { status: 400 });
+    return privateFailure(error, 'domain');
   }
 }

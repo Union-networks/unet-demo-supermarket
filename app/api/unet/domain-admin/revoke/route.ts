@@ -1,5 +1,5 @@
 import { sign } from 'node:crypto';
-import { NextResponse } from 'next/server';
+import { privateJson, privateFailure, readPrivateBody } from '../../../../../lib/private-route-response';
 import { revokeLedgerV2CredentialFromEnv } from '@u-net/issuer';
 import { SERVICE_ID } from '../../../../../lib/config';
 import { configureCredentialRuntime, domainAdminSigner } from '../../../../../lib/domain-admin-issuer';
@@ -28,14 +28,13 @@ const canonicalJson = (value: unknown): string => {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as RevokeRequest;
+    const body = await readPrivateBody<RevokeRequest>(request);
+    if (body.version === 1) throw new Error('protocol_upgrade_required');
     const challengeHeader = request.headers.get('x-unet-domain-admin-challenge') ?? '';
-    configureCredentialRuntime();
-    const signer = domainAdminSigner();
     if (body.version !== 2 || body.action !== 'domain-admin.revoke') throw new Error('domain_admin_callback_action_invalid');
-    if (body.serviceId !== SERVICE_ID || body.issuerId !== signer.issuerId) throw new Error('domain_admin_callback_service_mismatch');
-    if (!body.challenge || body.challenge !== challengeHeader || consumedChallenges.has(body.challenge)) throw new Error('domain_admin_challenge_invalid');
-    if (!body.expiresAt || Date.parse(body.expiresAt) <= Date.now()) throw new Error('domain_admin_callback_expired');
+    if (body.serviceId !== SERVICE_ID) throw new Error('domain_admin_callback_service_mismatch');
+    if (!body.challenge || challengeHeader.includes(',') || body.challenge !== challengeHeader || consumedChallenges.has(body.challenge)) throw new Error('domain_admin_challenge_invalid');
+    if (typeof body.expiresAt !== 'string' || !Number.isFinite(Date.parse(body.expiresAt)) || Date.parse(body.expiresAt) <= Date.now()) throw new Error('domain_admin_callback_expired');
     if (!/^[a-f0-9]{64}$/i.test(body.attestationHash ?? '') || !body.requestId || !body.reason) throw new Error('domain_admin_callback_invalid');
     if (!(await verifyControlAuthorization({
       body,
@@ -43,6 +42,9 @@ export async function POST(request: Request) {
       path: '/api/unet/domain-admin/revoke',
       audience: SERVICE_ID,
     }))) throw new Error('domain_admin_control_authorization_invalid');
+    configureCredentialRuntime();
+    const signer = domainAdminSigner();
+    if (body.issuerId !== signer.issuerId) throw new Error('domain_admin_callback_service_mismatch');
     consumedChallenges.add(body.challenge);
     if (consumedChallenges.size > 1000) consumedChallenges.delete(consumedChallenges.values().next().value!);
     const ledgerV2 = await revokeLedgerV2CredentialFromEnv({
@@ -61,9 +63,8 @@ export async function POST(request: Request) {
       ledgerV2TransactionHash: ledgerV2.transactionHash,
       ledgerV2IssuerIdHash: ledgerV2.issuerIdHash,
     };
-    return NextResponse.json({ keyId: signer.keyId, payload, signature: sign(null, Buffer.from(canonicalJson(payload), 'utf8'), signer.privateKeyPem).toString('base64url') });
+    return privateJson({ keyId: signer.keyId, payload, signature: sign(null, Buffer.from(canonicalJson(payload), 'utf8'), signer.privateKeyPem).toString('base64url') });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'domain_admin_revoke_failed';
-    return NextResponse.json({ success: false, errorCode: message, message }, { status: 400 });
+    return privateFailure(error, 'domain');
   }
 }

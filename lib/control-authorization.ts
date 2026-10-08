@@ -39,6 +39,7 @@ export async function verifyControlAuthorization(input: {
   path: string;
   audience: string;
 }): Promise<boolean> {
+  if (!/^v2\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(input.authorization ?? '')) return false;
   const publicKeys = await fetchUnetControlPublicKeys();
   const result = verifyDomainAdminControlAuthorizationV2({
     body: input.body,
