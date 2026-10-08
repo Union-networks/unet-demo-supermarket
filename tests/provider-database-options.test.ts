@@ -53,8 +53,8 @@ test('configuration failures reveal no supplied database credentials', () => {
     { message: 'provider_database_ca_invalid' });
   assert.throws(() => providerDatabaseOptions(undefined, { NODE_ENV: 'production' }),
     { message: 'provider_database_configuration_missing' });
-  assert.deepEqual(providerDatabaseOptions(undefined, { NODE_ENV: 'production', NEXT_PHASE: 'phase-production-build' }).ssl,
-    { rejectUnauthorized: true });
+  assert.throws(() => providerDatabaseOptions(undefined, { NODE_ENV: 'production', NEXT_PHASE: 'phase-production-build' }),
+    { message: 'provider_database_configuration_missing' });
 });
 
 test('schema and application options survive without TLS downgrades', () => {
