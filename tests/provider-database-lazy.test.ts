@@ -63,7 +63,9 @@ test('lazy pool initializes once and binds query, connect and event methods to t
     actual = this;
     assert.ok(this instanceof Pool);
     assert.equal(new URL(this.options.connectionString!).hostname, 'database.invalid');
-    assert.deepEqual(this.options.ssl, { rejectUnauthorized: true });
+    assert.ok(this.options.ssl && typeof this.options.ssl === 'object');
+    assert.equal(this.options.ssl.rejectUnauthorized, true);
+    assert.equal(typeof this.options.ssl.checkServerIdentity, 'function');
     return Promise.resolve(result);
   });
   t.mock.method(Pool.prototype, 'connect', function (this: Pool) {

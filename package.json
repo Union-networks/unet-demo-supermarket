@@ -6,6 +6,7 @@
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "test:database-transport": "node tests/provider-channel-binding.local-postgres.mjs --execute-local-disposable",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -15,7 +16,7 @@
     "@u-net/issuer": "2.0.0-rc.3",
     "@u-net/server": "2.0.0-rc.3",
     "next": "16.2.10",
-    "pg": "^8.16.3",
+    "pg": "8.22.0",
     "qrcode": "^1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0"
