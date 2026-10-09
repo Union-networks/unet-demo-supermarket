@@ -170,9 +170,10 @@ test('cookie-bound provider login and session security', async (t) => {
   await t.test('maintenance remains default-on', async () => {
     const { proxy } = await import('../proxy');
     delete process.env.UNET_LOGIN_SECURITY_MAINTENANCE;
-    assert.equal(proxy().status, 503);
+    const request = new Request('https://provider.test/api/unet/login/challenge');
+    assert.equal(proxy(request).status, 503);
     process.env.UNET_LOGIN_SECURITY_MAINTENANCE = 'false';
-    assert.equal(proxy().status, 200);
+    assert.equal(proxy(request).status, 200);
     delete process.env.UNET_LOGIN_SECURITY_MAINTENANCE;
   });
 
