@@ -110,7 +110,7 @@ test('actual provider routes sanitize initialization failures and preserve SDK r
   await t.test('diagnostic runtime allowlists reject arbitrary strings and extra error fields', () => {
     recordProviderFailure(canary as never, canary as never);
     const record = warn.mock.calls.at(-1)!.arguments[0] as Record<string, unknown>;
-    assert.deepEqual(Object.keys(record).sort(), ['diagnosticId', 'event', 'operation', 'outcome']);
+    assert.deepEqual(Object.keys(record).sort(), ['diagnosticId', 'event', 'failureCategory', 'operation', 'outcome']);
     assert.equal(record.operation, 'unknown');
     assert.equal(record.event, 'provider_route_failed');
   });
