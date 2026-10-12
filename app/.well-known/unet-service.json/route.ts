@@ -7,6 +7,7 @@ export async function GET() {
     serviceId: SERVICE_ID,
     origin: PUBLIC_SITE_ORIGIN,
     accountPolicy: { mode: "single", maxAccounts: 1, policyVersion: 2 },
+    miniapp: { launchReadinessVersion: 1 },
     endpoints: {
       challenge: `${PUBLIC_SITE_ORIGIN}/api/unet/login/challenge`,
       approval: `${PUBLIC_SITE_ORIGIN}/api/unet/login/approve`,

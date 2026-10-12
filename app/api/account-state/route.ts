@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   if (!principal) return unauthorized();
   try {
     const state = await getAccountState(principal.scopedUserId);
-    return NextResponse.json({ success: true, state }, { headers: { "cache-control": "private, no-store" } });
+    return NextResponse.json({ success: true, scopedUserId: principal.scopedUserId, state }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     if (error instanceof Error && error.message === 'service_account_retired') return unauthorized();
     return NextResponse.json({ success: false, message: 'account_state_unavailable' }, { status: 503 });

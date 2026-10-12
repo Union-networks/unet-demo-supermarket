@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "status": "locally_verified_not_deployed",
+  "provider": "supermarket",
+  "checkout": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009",
+  "baseCommit": "bd91e05c20d668507864f00237358939323e4b01",
+  "remoteMainAtLastVerification": "bd91e05c20d668507864f00237358939323e4b01",
+  "sdk": {
+    "version": "2.0.0-rc.4",
+    "sourceCommit": "75ae52d92c5336082f8a547e269fc18a578a3f72",
+    "registryPublished": false,
+    "frozenManifestPath": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/sdk-miniapp-rc4-manifest.json",
+    "frozenManifestSha256": "5ff6b91c3bb93cdbf4ef78b7b980918d74b8ef72f0386108c4b075e33ea5d8dc",
+    "artifacts": [
+      {
+        "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-client-2.0.0-rc.4.tgz",
+        "sha256": "8e81af6dccd8d1b67619773f6af91bc583cdcada5eb8e78b689ca2b5d68fb292"
+      },
+      {
+        "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-contracts-2.0.0-rc.4.tgz",
+        "sha256": "e2cda390be6c3fd30046afd10837b61520247498b0039645072ab2b4bb98e8eb"
+      },
+      {
+        "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-issuer-2.0.0-rc.4.tgz",
+        "sha256": "4936de602d9d8478e42760037f4b88ff7f474cc8cfd7e97ec9b11eff781d4b70"
+      },
+      {
+        "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-server-2.0.0-rc.4.tgz",
+        "sha256": "ab3d69163935316eb825a4d1adb04cf5bab2e5418a97402f6134730a67917f57"
+      },
+      {
+        "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-web-login-2.0.0-rc.4-c3c284c5c6e4.tgz",
+        "sha256": "c3c284c5c6e47eeb2ae1a9e54a72ce3e277a02c28f1c141c5d8125db751d8cfe"
+      }
+    ]
+  },
+  "api": {
+    "entrypoint": "@u-net/web-login.runMiniappLogin<Account extends {scopedUserId:string}>(options): Promise<Account>",
+    "callbacks": [
+      "createChallenge(signal)",
+      "approve(challenge, signal)",
+      "exchange(challenge, signal)",
+      "initialize(account, signal)",
+      "complete(payload, signal)"
+    ],
+    "approvalAction": "host.createServiceSession",
+    "approvalPayload": "{challenge}",
+    "completionAction": "host.completeLaunch",
+    "completionFields": [
+      "requestRef",
+      "launchToken",
+      "state",
+      "stage",
+      "outcome"
+    ],
+    "completionAcknowledgement": "{completed:true}",
+    "timeoutMs": 60000,
+    "initializationDeadlineMs": 15000,
+    "readinessExpiryMaximumMs": 30000
+  },
+  "verification": {
+    "focusedTestsPassed": 36,
+    "typecheck": "passed",
+    "buildCommand": "npm run build -- --webpack",
+    "build": "passed",
+    "nativeHostEndToEndAcceptance": "requires_parent_integration",
+    "genericPolicyPage": "unchanged_provider_owned"
+  },
+  "deploymentPlan": [
+    "Recheck remote main before integration; compare any movement against baseCommit and preserve its security fixes.",
+    "Integrate only this provider commit and the exact vendored SDK artifacts with the parent's native, trust and Safety changes.",
+    "Run the recorded focused checks and build, then let the parent perform Vercel deployment and native acceptance."
+  ],
+  "ownedFiles": [
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/app/.well-known/unet-service.json/route.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/app/api/account-state/route.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/components/SupermarketApp.tsx",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/lib/account-bootstrap.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/lib/browser-login.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/lib/miniapp-login.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/package-lock.json",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/package.json",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/tests/direct-login-options.test.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/tests/login-security.test.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/tests/miniapp-login.test.ts",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/sdk-miniapp-rc4-manifest.json",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-client-2.0.0-rc.4.tgz",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-contracts-2.0.0-rc.4.tgz",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-issuer-2.0.0-rc.4.tgz",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-server-2.0.0-rc.4.tgz",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-web-login-2.0.0-rc.4-c3c284c5c6e4.tgz",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/provider-launch-candidate.json"
+  ]
+}

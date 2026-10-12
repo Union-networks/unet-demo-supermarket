@@ -1,0 +1,212 @@
+{
+  "version": "2.0.0-rc.4",
+  "status": "packed-unpublished",
+  "artifacts": [
+    {
+      "name": "@u-net/contracts",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-contracts-2.0.0-rc.4.tgz",
+      "sha256": "e2cda390be6c3fd30046afd10837b61520247498b0039645072ab2b4bb98e8eb"
+    },
+    {
+      "name": "@u-net/client",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-client-2.0.0-rc.4.tgz",
+      "sha256": "8e81af6dccd8d1b67619773f6af91bc583cdcada5eb8e78b689ca2b5d68fb292"
+    },
+    {
+      "name": "@u-net/server",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-server-2.0.0-rc.4.tgz",
+      "sha256": "ab3d69163935316eb825a4d1adb04cf5bab2e5418a97402f6134730a67917f57"
+    },
+    {
+      "name": "@u-net/web-login",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-web-login-2.0.0-rc.4.tgz",
+      "sha256": "c3c284c5c6e47eeb2ae1a9e54a72ce3e277a02c28f1c141c5d8125db751d8cfe"
+    },
+    {
+      "name": "@u-net/issuer",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-issuer-2.0.0-rc.4.tgz",
+      "sha256": "4936de602d9d8478e42760037f4b88ff7f474cc8cfd7e97ec9b11eff781d4b70"
+    }
+  ],
+  "source": {
+    "baseCommit": "c2fd9905c4144efa01f75b82d66fa45fb93fbf08",
+    "sourceCommit": "75ae52d92c5336082f8a547e269fc18a578a3f72",
+    "sourceState": "committed-intended-sdk-delta-over-rc3; not a registry release or clean CI attestation",
+    "intendedCodeApiChanges": [
+      {
+        "path": "packages/web-login/src/index.ts",
+        "changes": [
+          "DirectProviderLoginOptions.signal",
+          "provider fetch abort propagation and redirect rejection with same-origin cookies",
+          "miniapp helper/type exports"
+        ]
+      },
+      {
+        "path": "packages/web-login/src/miniappLogin.ts",
+        "changes": [
+          "runMiniappLogin<Account extends MiniappLoginAccount>",
+          "five callback adapters",
+          "exact approval/completion contracts",
+          "mandatory completed:true ready acknowledgement",
+          "fixed V1 readiness, native 64hex token and maximum 30-second future expiry",
+          "maximum 15-second post-approval initial-status deadline and 60-second overall cap",
+          "authoritative exchange/initialize identity matching",
+          "bounded cancellation/deadlines and best-effort failure completion",
+          "no navigation/logging/token persistence"
+        ]
+      },
+      {
+        "path": "packages/server/src/serviceManifest.ts",
+        "changes": [
+          "UnetServiceManifestV2.miniapp.launchReadinessVersion:1",
+          "UnetServiceManifestOptions.miniappLaunchReadiness; strict true opt-in"
+        ]
+      }
+    ],
+    "intendedFiles": [
+      {
+        "path": ".changeset/pre/miniapp-launch-readiness.md",
+        "sha256": "4bd8fe1bc87368bf4905d8f872b13aff8ce4433e77122c4dc9c9a51346d8efed"
+      },
+      {
+        "path": "package.json",
+        "sha256": "65cf37cb45ad8726d57820c8c7b7daf174b6ab73ed18e41a7a43f3d7b7449bd5"
+      },
+      {
+        "path": "packages/client/package.json",
+        "sha256": "42fd2be1455d4c4f493c962a9f7082e3aaff757b0e6a8e8c3731175b68272f30"
+      },
+      {
+        "path": "packages/client/CHANGELOG.md",
+        "sha256": "6b236b9a5b617948acefab3f4636775a07e12229ce4e191dd88f0281933958a9"
+      },
+      {
+        "path": "packages/contracts/package.json",
+        "sha256": "ace1af54ab21a6e67adfe994f12984c394f0760653da2a34c1085056e3068ff0"
+      },
+      {
+        "path": "packages/contracts/CHANGELOG.md",
+        "sha256": "bd6470a55623eb1cb1578aa941b9081acad1a76cda861a9a18c181354b3670c6"
+      },
+      {
+        "path": "packages/issuer/package.json",
+        "sha256": "592172b76f89f212b411b1e6c64a800668cd748b6f5a700499d0de025db6ce6a"
+      },
+      {
+        "path": "packages/issuer/CHANGELOG.md",
+        "sha256": "39ec7fa578f3fa55ac2389be6c9afa5e2825e4f66d3f1d0c43940ce37245ff6b"
+      },
+      {
+        "path": "packages/react/package.json",
+        "sha256": "68567de1bdea68631f6db487ca4602f376b19ee366a74e20e327913908c60b0a"
+      },
+      {
+        "path": "packages/react/CHANGELOG.md",
+        "sha256": "b1d8a10c9502f3d998d02a9598e57ea0f1821de697c876eaf525450f5aa557f1"
+      },
+      {
+        "path": "packages/server/package.json",
+        "sha256": "b17e0409efcb67a44f886aa16f2e1ae4e18995c4c11e994de6f27fa9d908d054"
+      },
+      {
+        "path": "packages/server/CHANGELOG.md",
+        "sha256": "393a8c73c41c86e4b9bca612b46097a30865cbfa95d150a3696b23867eb586e0"
+      },
+      {
+        "path": "packages/setup/package.json",
+        "sha256": "e6e61fda3ea2c1105dbc5df2bd5efa533307d1654e33d5103cb8ebef2567412f"
+      },
+      {
+        "path": "packages/setup/CHANGELOG.md",
+        "sha256": "389e0eb71e379015bcbac454706dde014b0283ff75e29d46b4a41b2a4cae5a63"
+      },
+      {
+        "path": "packages/verification/package.json",
+        "sha256": "c1478b273ad2d8e2f2f5bebd3dd0b6f9bfd15b1ea3a981270f0e2be99eeea100"
+      },
+      {
+        "path": "packages/verification/CHANGELOG.md",
+        "sha256": "f4e51442e98165e4200a9046395fb2e4631d0a16a3750886873a3f6f6079ceb5"
+      },
+      {
+        "path": "packages/web-login/package.json",
+        "sha256": "023bf62ed40acbdf39ac31c14ad3d4f65c0c072e926927a3ace5f393960e4805"
+      },
+      {
+        "path": "packages/web-login/CHANGELOG.md",
+        "sha256": "b3a2ebcdbf85ece26092082ee8d1a7d722ba58e8c0b9bb8fbc8ddd8807634641"
+      },
+      {
+        "path": "packages/web-login/src/index.ts",
+        "sha256": "bf56e81bc3185e65a07a55947eff792efdce710773d38f356f636fd6cd35cbbb"
+      },
+      {
+        "path": "packages/web-login/src/miniappLogin.ts",
+        "sha256": "e12ee0295d9802f85bee63c469a5752ac7e3d69b0b16090653c7f36f727514d0"
+      },
+      {
+        "path": "packages/web-login/src/index.test.ts",
+        "sha256": "2c7889cd451cf6b2640530bdbb40e4cec6535a76a1b5d83e7a0fca0df2317678"
+      },
+      {
+        "path": "packages/web-login/src/miniappLogin.test.ts",
+        "sha256": "1a62e9d8613647094402991b454fced3aebfbbaf09e1812e88c08594a0ebae51"
+      },
+      {
+        "path": "packages/web-login/etc/web-login.api.md",
+        "sha256": "f7f519709e85cc6ca2e25b15ca8048d8cdc2b7ec38ef4fbecc07635bb5a86fa8"
+      },
+      {
+        "path": "packages/web-login/README.md",
+        "sha256": "77317196cd8a13b7c01533345b05ed524f9e7bb7c464ea8da60ed49e06637092"
+      },
+      {
+        "path": "packages/server/src/serviceManifest.ts",
+        "sha256": "f84d80382baf0cb528b895bcd548555d676aff2ea31623020a55a0c3401a6a57"
+      },
+      {
+        "path": "packages/server/src/serviceManifest.test.ts",
+        "sha256": "9d8e4e867859258f1cec6afc97cef2496da30bddb140998299723be9f57a4276"
+      },
+      {
+        "path": "packages/server/etc/server.api.md",
+        "sha256": "01cefbfa3381bd23b3768be0e2f955f880baed1ac06437cf6f8820f1ed478c6d"
+      },
+      {
+        "path": "packages/server/README.md",
+        "sha256": "d80787f33fafd1fb2c5b56c20fd0b9007f59467c4909c10da81371c386983c78"
+      },
+      {
+        "path": "docs/guides/miniapp-ready.md",
+        "sha256": "def1e3f7708f5b59eccc170460a4d1e85300f55e8a4d30cae72cca0ee4dc21d5"
+      },
+      {
+        "path": "docs/changelog.md",
+        "sha256": "b06b22111a49d85af2c91520c56778342c855e1e6faa7b699695151379435fb0"
+      },
+      {
+        "path": "scripts/write-release-manifest.mjs",
+        "sha256": "643a235f2f2830264ed150d859e1cf1ff6c8f71777c9b47d227d808d6b4d58a3"
+      },
+      {
+        "path": "scripts/write-release-manifest.test.ts",
+        "sha256": "9a9fc3994cd595164a04e3a5e62226efa163adf1f121307ad3d64e6117fab57c"
+      },
+      {
+        "path": "scripts/check-miniapp-candidate.mjs",
+        "sha256": "7bcab5dde228fec188b60fa5fd58b5b2648a068f64974960f4eabe3f1900989a"
+      }
+    ],
+    "preExistingExcludedPaths": [
+      "docs/concepts/privacy-design-follow-up.md",
+      "experiments/"
+    ],
+    "ownershipNotes": "Initial tracked SDK status contained only dirty privacy notes plus untracked experiments. RC4 changelog/version edits and miniapp exports listed here were made in this run; committed earlier RC3 changelog/export content is preserved. Compatibility forwarders are not changed. Only the explicit intended SDK file allowlist is committed; pre-existing privacy notes/experiments remain uncommitted."
+  },
+  "validationBoundary": "Core four tarballs passed packed runtime smoke. Supplemental issuer: packed metadata/version/range/inventory/hash and workspace typecheck checked; no new issuer behavior or broad issuer release campaign.",
+  "packing": {
+    "consecutivePacks": 2,
+    "allFiveHashesIdentical": true,
+    "sourceMetadataEmbeddedInTarballs": false
+  }
+}

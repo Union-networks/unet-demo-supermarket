@@ -184,8 +184,10 @@ test('cookie-bound provider login and session security', async (t) => {
       assert.doesNotMatch(source, /exchangeSession|createChallenge|\.poll\(/);
     }
     const client = readFileSync(new URL('../components/SupermarketApp.tsx', import.meta.url), 'utf8');
-    assert.match(client, /requestRef: challenge.requestRef/);
+    assert.match(client, /runSupermarketMiniappLogin/);
     assert.doesNotMatch(client, /sessionId/);
-    assert.match(client, /approved !== true/);
+    const adapter = readFileSync(new URL('../lib/miniapp-login.ts', import.meta.url), 'utf8');
+    assert.match(adapter, /runMiniappLogin/);
+    assert.match(adapter, /'host.createServiceSession', \{ challenge \}/);
   });
 });

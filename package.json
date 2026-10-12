@@ -13,13 +13,23 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@u-net/issuer": "2.0.0-rc.3",
-    "@u-net/server": "2.0.0-rc.3",
+    "@u-net/client": "file:vendor/u-net-client-2.0.0-rc.4.tgz",
+    "@u-net/contracts": "file:vendor/u-net-contracts-2.0.0-rc.4.tgz",
+    "@u-net/issuer": "file:vendor/u-net-issuer-2.0.0-rc.4.tgz",
+    "@u-net/server": "file:vendor/u-net-server-2.0.0-rc.4.tgz",
+    "@u-net/web-login": "file:vendor/u-net-web-login-2.0.0-rc.4-c3c284c5c6e4.tgz",
     "next": "16.2.10",
     "pg": "8.22.0",
     "qrcode": "^1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0"
+  },
+  "overrides": {
+    "@u-net/client": "$@u-net/client",
+    "@u-net/contracts": "$@u-net/contracts",
+    "@u-net/issuer": "$@u-net/issuer",
+    "@u-net/server": "$@u-net/server",
+    "@u-net/web-login": "$@u-net/web-login"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

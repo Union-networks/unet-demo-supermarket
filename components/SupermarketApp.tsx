@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { runSupermarketMiniappLogin } from "../lib/miniapp-login";
 import { createProviderChallenge, exchangeProviderChallenge, loginQrPayload } from "../lib/browser-login";
 import { SERVICE_ID } from "../lib/config";
 import { PRODUCTS } from "../lib/products";
@@ -18,6 +19,7 @@ type PendingHostRequest = {
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
   timeout: ReturnType<typeof setTimeout>;
+  cleanup?: () => void;
 };
 
 type ActiveAgeCheck = {
@@ -99,6 +101,7 @@ export function SupermarketApp() {
   const [verifyTone, setVerifyTone] = useState<"neutral" | "success" | "warning" | "error">("neutral");
   const [miniAppMode, setMiniAppMode] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [ageCheck, setAgeCheck] = useState<ActiveAgeCheck | null>(null);
   const hostSeq = useRef(0);
   const pendingHost = useRef(new Map<string, PendingHostRequest>());
@@ -106,6 +109,11 @@ export function SupermarketApp() {
   const mutationSequence = useRef(0);
   const mutationQueue = useRef<Promise<void>>(Promise.resolve());
   const miniAppAttempted = useRef(false);
+  const miniAppReady = useRef(false);
+  const miniAppAttempts = useRef(0);
+  const miniAppRun = useRef<Promise<void> | null>(null);
+  const miniAppController = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
   const loginAttempt = useRef(0);
 
   const categories = useMemo(() => ["All", ...Array.from(new Set(products.map((product) => product.category)))], [products]);
@@ -141,7 +149,7 @@ export function SupermarketApp() {
 
   const saveSession = useCallback((next: SessionState | null) => {
     setSession(next);
-    window.localStorage.removeItem(sessionKey);
+    try { window.localStorage.removeItem(sessionKey); } catch { /* Cookie-backed sessions do not need storage. */ }
   }, []);
 
   const loadProducts = useCallback(async () => {
@@ -160,11 +168,10 @@ export function SupermarketApp() {
   const cacheAccountState = useCallback((scopedUserId: string, next: AccountState) => {
     stateRef.current = next;
     setState(next);
-    window.localStorage.setItem(stateKey(scopedUserId), JSON.stringify(next));
+    try { window.localStorage.setItem(stateKey(scopedUserId), JSON.stringify(next)); } catch { /* The authoritative state is already loaded. */ }
   }, []);
 
-  const loadState = useCallback(async () => {
-    const scopedUserId = session?.scopedUserId;
+  const loadState = useCallback(async (scopedUserId?: string) => {
     if (!scopedUserId) return;
     let cached: AccountState | null = null;
     try {
@@ -175,7 +182,7 @@ export function SupermarketApp() {
     }
     const response = await fetch("/api/account-state", { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as AccountStateResponse;
-    if (response.status === 401) { saveSession(null); setState(emptyState); return; }
+    if (response.status === 401) { saveSession(null); setState(emptyState); throw new Error("Please sign in again."); }
     if (!response.ok || !payload.success || !payload.state) throw new Error(payload.message || "Could not synchronize account state.");
     if (
       payload.state.revision === 0
@@ -196,7 +203,7 @@ export function SupermarketApp() {
       }
     }
     cacheAccountState(scopedUserId, payload.state);
-  }, [cacheAccountState, saveSession, session?.scopedUserId]);
+  }, [cacheAccountState, saveSession]);
 
   const mutateState = useCallback((mutation: AccountStateMutation, optimistic: (current: AccountState) => AccountState) => {
     const scopedUserId = session?.scopedUserId;
@@ -215,7 +222,7 @@ export function SupermarketApp() {
     }).catch(async (error) => {
       if (sequence !== mutationSequence.current) return;
       setStatus(error instanceof Error ? error.message : "Could not synchronize account state.");
-      await loadState().catch(() => undefined);
+      await loadState(scopedUserId).catch(() => undefined);
     });
   }, [cacheAccountState, loadState, session?.scopedUserId]);
 
@@ -249,20 +256,31 @@ export function SupermarketApp() {
   );
 
   const callHost = useCallback(
-    async <T,>(action: string, payload: Record<string, unknown> = {}): Promise<T> => {
+    async <T,>(action: string, payload: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> => {
       await waitForHostBridge();
+      if (signal?.aborted) throw new Error("Login cancelled.");
       return new Promise<T>((resolve, reject) => {
         const id = `supermarket-${++hostSeq.current}`;
-        const timeoutMs = action === "host.requestVerification" ? 180000 : 30000;
+        const timeoutMs = action === "host.requestVerification" ? 180000 : action === "host.createServiceSession" ? 90000 : 30000;
+        const cleanup = () => signal?.removeEventListener("abort", abort);
+        const abort = () => {
+          clearTimeout(timeout);
+          pendingHost.current.delete(id);
+          cleanup();
+          reject(new Error("Login cancelled."));
+        };
         const timeout = setTimeout(() => {
           pendingHost.current.delete(id);
+          cleanup();
           reject(new Error("U-net host did not respond."));
         }, timeoutMs);
         pendingHost.current.set(id, {
           resolve: (value) => resolve(value as T),
           reject,
           timeout,
+          cleanup,
         });
+        signal?.addEventListener("abort", abort, { once: true });
         window.ReactNativeWebView?.postMessage(JSON.stringify({ id, action, payload }));
       });
     },
@@ -270,29 +288,56 @@ export function SupermarketApp() {
   );
 
   const connectMiniAppSession = useCallback(async () => {
+    if (miniAppReady.current) return;
+    if (miniAppRun.current) return miniAppRun.current;
+    if (miniAppAttempts.current >= 3) throw new Error("Close and reopen the shop to try again.");
+    miniAppAttempts.current += 1;
     setMiniAppMode(true);
+    setIsConnecting(true);
     setStatus("Connecting to U-net...");
-    const challenge = await createProviderChallenge();
-    const approved = await callHost<{ requestRef?: string; approved?: boolean; scopedUserId?: string }>(
-      "host.createServiceSession", { requestRef: challenge.requestRef },
-    );
-    if (approved.approved !== true || approved.requestRef !== challenge.requestRef || !approved.scopedUserId) {
-      throw new Error("U-net host did not approve this login challenge.");
-    }
-    const exchanged = await exchangeProviderChallenge(challenge.requestRef);
-    if (exchanged.scopedUserId !== approved.scopedUserId) throw new Error("U-net login account mismatch.");
-    saveSession(exchanged);
-    setStatus("Connected through the U-net app. This shop only knows your supermarket-scoped ID.");
-  }, [callHost, saveSession]);
+    const controller = new AbortController();
+    miniAppController.current = controller;
+    const run = (async () => {
+      try {
+        const account = await runSupermarketMiniappLogin(window.location.origin, callHost, controller.signal, (scopedUserId, authoritative) => {
+          if (!mounted.current) throw new Error("Shop closed.");
+          cacheAccountState(scopedUserId, authoritative);
+        });
+        if (!mounted.current) return;
+        miniAppReady.current = true;
+        saveSession(account);
+        setIsLoginOpen(false);
+        setStatus("Connected through the U-net app. This shop only knows your supermarket-scoped ID.");
+      } catch (error) {
+        if (mounted.current) {
+          saveSession(null);
+          stateRef.current = emptyState;
+          setState(emptyState);
+          setStatus("Shop sign-in or initial account state is temporarily unavailable.");
+          setLoginStatus("Shop sign-in or initial account state is unavailable. Please try again.");
+          setIsLoginOpen(true);
+        }
+        throw error;
+      } finally {
+        miniAppRun.current = null;
+        miniAppController.current = null;
+        if (mounted.current) setIsConnecting(false);
+      }
+    })();
+    miniAppRun.current = run;
+    return run;
+  }, [cacheAccountState, callHost, saveSession]);
 
   useEffect(() => {
+    mounted.current = true;
     window.__unetReceiveHostMessage = (message: HostMessage) => {
       if (!message || message.source !== "unet-host" || !message.id) return;
       const pending = pendingHost.current.get(message.id);
       if (!pending) return;
       pendingHost.current.delete(message.id);
       clearTimeout(pending.timeout);
-      if (message.ok) pending.resolve(message.result);
+      pending.cleanup?.();
+      if (message.ok === true) pending.resolve(message.result);
       else pending.reject(new Error(message.error || "U-net host request failed."));
     };
     const listener = (event: MessageEvent) => {
@@ -302,17 +347,26 @@ export function SupermarketApp() {
     window.addEventListener("message", listener);
     document.addEventListener("message", listener as EventListener);
     return () => {
+      mounted.current = false;
       window.removeEventListener("message", listener);
       document.removeEventListener("message", listener as EventListener);
       delete window.__unetReceiveHostMessage;
-      pendingHost.current.forEach((pending) => clearTimeout(pending.timeout));
-      pendingHost.current.clear();
+      queueMicrotask(() => {
+        if (mounted.current) return;
+        miniAppController.current?.abort();
+        pendingHost.current.forEach((pending) => {
+          clearTimeout(pending.timeout);
+          pending.cleanup?.();
+          pending.reject(new Error("Shop closed."));
+        });
+        pendingHost.current.clear();
+      });
     };
   }, []);
 
   useEffect(() => {
     setMiniAppMode(readMiniAppMode());
-    window.localStorage.removeItem(sessionKey);
+    try { window.localStorage.removeItem(sessionKey); } catch { /* No stored login is used. */ }
     if (readMiniAppMode()) return;
     let cancelled = false;
     void fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' }).then(async (response) => {
@@ -331,16 +385,16 @@ export function SupermarketApp() {
   }, [loadAgeCheck]);
 
   useEffect(() => {
-    loadState().catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
-  }, [loadState]);
+    if (readMiniAppMode()) return;
+    loadState(session?.scopedUserId).catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
+  }, [loadState, session?.scopedUserId]);
 
   useEffect(() => {
-    if (!readMiniAppMode() || session?.scopedUserId || miniAppAttempted.current) return;
+    if (!readMiniAppMode() || miniAppAttempted.current) return;
     miniAppAttempted.current = true;
     connectMiniAppSession()
-      .then(() => loadState())
-      .catch((error) => setStatus(error instanceof Error ? error.message : String(error)));
-  }, [connectMiniAppSession, loadState, session?.scopedUserId]);
+      .catch(() => undefined);
+  }, [connectMiniAppSession]);
 
   const requireLogin = useCallback(() => {
     if (session?.scopedUserId) return true;
@@ -374,7 +428,7 @@ export function SupermarketApp() {
       saveSession(exchanged);
       setLoginStatus("Signed in.");
       setIsLoginOpen(false);
-      await loadState();
+      await loadState(exchanged.scopedUserId);
     } else {
       setLoginStatus(result.state === "denied" ? "Login denied." : "QR expired.");
     }
@@ -525,9 +579,10 @@ export function SupermarketApp() {
           </div>
           <button
             className="primary"
+            disabled={isConnecting}
             onClick={() => (session?.scopedUserId ? undefined : startLogin().catch((error) => setLoginStatus(error.message)))}
           >
-            {session?.scopedUserId ? "Signed in" : "Sign in with U-net"}
+            {isConnecting ? "Connecting..." : session?.scopedUserId ? "Signed in" : "Sign in with U-net"}
           </button>
         </div>
       </header>
@@ -658,8 +713,11 @@ export function SupermarketApp() {
                 Close
               </button>
             </div>
-            <div className="qr">{loginQr ? <img alt="U-net login QR" src={loginQr} /> : <span className="muted">Creating QR...</span>}</div>
+            {!miniAppMode ? <div className="qr">{loginQr ? <img alt="U-net login QR" src={loginQr} /> : <span className="muted">Creating QR...</span>}</div> : null}
             <div className="muted">{loginStatus}</div>
+            {miniAppMode ? <button className="primary" disabled={isConnecting || miniAppAttempts.current >= 3} onClick={() => void connectMiniAppSession().catch(() => undefined)}>
+              {isConnecting ? "Connecting..." : miniAppAttempts.current >= 3 ? "Close and reopen to try again" : "Try again"}
+            </button> : null}
           </section>
         </div>
       ) : null}

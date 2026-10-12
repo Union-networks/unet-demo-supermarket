@@ -1,8 +1,9 @@
 import type { DirectLoginChallenge } from '@u-net/server';
 
-export async function createProviderChallenge(): Promise<DirectLoginChallenge> {
+export async function createProviderChallenge(signal?: AbortSignal): Promise<DirectLoginChallenge> {
   const response = await fetch('/api/unet/login/challenge', {
     method: 'POST', credentials: 'same-origin', cache: 'no-store',
+    signal, redirect: 'error',
     headers: { 'content-type': 'application/json' }, body: '{}',
   });
   const result = await response.json().catch(() => ({}));
@@ -12,9 +13,10 @@ export async function createProviderChallenge(): Promise<DirectLoginChallenge> {
   return result.challenge;
 }
 
-export async function exchangeProviderChallenge(requestRef: string): Promise<{ scopedUserId: string }> {
+export async function exchangeProviderChallenge(requestRef: string, signal?: AbortSignal): Promise<{ scopedUserId: string }> {
   const response = await fetch('/api/unet/login/exchange', {
     method: 'POST', credentials: 'same-origin', cache: 'no-store',
+    signal, redirect: 'error',
     headers: { 'content-type': 'application/json' }, body: JSON.stringify({ requestRef }),
   });
   const result = await response.json().catch(() => ({}));

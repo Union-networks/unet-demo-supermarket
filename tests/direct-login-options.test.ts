@@ -65,7 +65,7 @@ test('maintenance bypass permits only known login OPTIONS metadata, never login 
     if (saved === undefined) delete process.env.UNET_LOGIN_SECURITY_MAINTENANCE;
     else process.env.UNET_LOGIN_SECURITY_MAINTENANCE = saved;
   });
-  assert.deepEqual(config.matcher, ['/api/unet/login/:path*']);
+  assert.deepEqual(config.matcher, ['/api/unet/login/:path*', '/api/unet/domain-admin/issue', '/api/unet/domain-admin/revoke']);
   for (const flag of [undefined, 'true', 'FALSE', '']) {
     if (flag === undefined) delete process.env.UNET_LOGIN_SECURITY_MAINTENANCE;
     else process.env.UNET_LOGIN_SECURITY_MAINTENANCE = flag;
@@ -84,7 +84,8 @@ test('maintenance bypass permits only known login OPTIONS metadata, never login 
       }
     }
     for (const path of ['/api/unet/login', '/api/unet/login/unknown', '/api/unet/login/challenge/nested',
-      '/api/unet/login/Challenge', '/api/unet/login/%63hallenge', '/api/unet/account/retire']) {
+      '/api/unet/login/Challenge', '/api/unet/login/%63hallenge', '/api/unet/account/retire',
+      '/api/unet/domain-admin/issue', '/api/unet/domain-admin/revoke']) {
       assert.equal(proxy(new Request('https://provider.test' + path, { method: 'OPTIONS' })).status, 503);
     }
   }
