@@ -188,6 +188,6 @@ test('cookie-bound provider login and session security', async (t) => {
     assert.doesNotMatch(client, /sessionId/);
     const adapter = readFileSync(new URL('../lib/miniapp-login.ts', import.meta.url), 'utf8');
     assert.match(adapter, /runMiniappLogin/);
-    assert.match(adapter, /'host.createServiceSession', \{ challenge \}/);
+    assert.match(adapter, /'host.createServiceSession', \{\s*requestRef: challenge.requestRef, publicChallenge: challenge, loginDeadlineMs: context.expiresAtMs,\s*\}/);
   });
 });

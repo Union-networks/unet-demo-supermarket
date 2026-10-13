@@ -4,13 +4,14 @@
   "provider": "supermarket",
   "checkout": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009",
   "baseCommit": "bd91e05c20d668507864f00237358939323e4b01",
+  "reviewFixBaseCommit": "979f456a45a8c358b16a1e4a8f10a6c6c8568669",
   "remoteMainAtLastVerification": "bd91e05c20d668507864f00237358939323e4b01",
   "sdk": {
     "version": "2.0.0-rc.4",
-    "sourceCommit": "75ae52d92c5336082f8a547e269fc18a578a3f72",
+    "sourceCommit": "535a2f67b34abf395011238f3300ab978c926ea5",
     "registryPublished": false,
     "frozenManifestPath": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/sdk-miniapp-rc4-manifest.json",
-    "frozenManifestSha256": "5ff6b91c3bb93cdbf4ef78b7b980918d74b8ef72f0386108c4b075e33ea5d8dc",
+    "frozenManifestSha256": "b1879a5a5fdb8c7a270c1d52b41566063c6f62fc85b58f8e6a6f8b7df3e37fcc",
     "artifacts": [
       {
         "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-client-2.0.0-rc.4.tgz",
@@ -29,8 +30,8 @@
         "sha256": "ab3d69163935316eb825a4d1adb04cf5bab2e5418a97402f6134730a67917f57"
       },
       {
-        "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-web-login-2.0.0-rc.4-c3c284c5c6e4.tgz",
-        "sha256": "c3c284c5c6e47eeb2ae1a9e54a72ce3e277a02c28f1c141c5d8125db751d8cfe"
+        "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-web-login-2.0.0-rc.4-f8afbfde653e.tgz",
+        "sha256": "f8afbfde653ea8a36cf482a23e24e97aba5326c46005277e478e298fc7f17163"
       }
     ]
   },
@@ -38,13 +39,13 @@
     "entrypoint": "@u-net/web-login.runMiniappLogin<Account extends {scopedUserId:string}>(options): Promise<Account>",
     "callbacks": [
       "createChallenge(signal)",
-      "approve(challenge, signal)",
+      "approve(challenge, signal, context)",
       "exchange(challenge, signal)",
       "initialize(account, signal)",
       "complete(payload, signal)"
     ],
     "approvalAction": "host.createServiceSession",
-    "approvalPayload": "{challenge}",
+    "approvalPayload": "{requestRef:challenge.requestRef,publicChallenge:challenge,loginDeadlineMs:context.expiresAtMs}",
     "completionAction": "host.completeLaunch",
     "completionFields": [
       "requestRef",
@@ -59,7 +60,7 @@
     "readinessExpiryMaximumMs": 30000
   },
   "verification": {
-    "focusedTestsPassed": 36,
+    "focusedTestsPassed": 39,
     "typecheck": "passed",
     "buildCommand": "npm run build -- --webpack",
     "build": "passed",
@@ -88,7 +89,7 @@
     "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-contracts-2.0.0-rc.4.tgz",
     "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-issuer-2.0.0-rc.4.tgz",
     "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-server-2.0.0-rc.4.tgz",
-    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-web-login-2.0.0-rc.4-c3c284c5c6e4.tgz",
+    "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/u-net-web-login-2.0.0-rc.4-f8afbfde653e.tgz",
     "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/supermarket-login-reopen-20261009/vendor/provider-launch-candidate.json"
   ]
 }

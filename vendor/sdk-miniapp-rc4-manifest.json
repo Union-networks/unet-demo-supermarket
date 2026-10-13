@@ -4,33 +4,33 @@
   "artifacts": [
     {
       "name": "@u-net/contracts",
-      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-contracts-2.0.0-rc.4.tgz",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-535a2f67b34a/u-net-contracts-2.0.0-rc.4.tgz",
       "sha256": "e2cda390be6c3fd30046afd10837b61520247498b0039645072ab2b4bb98e8eb"
     },
     {
       "name": "@u-net/client",
-      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-client-2.0.0-rc.4.tgz",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-535a2f67b34a/u-net-client-2.0.0-rc.4.tgz",
       "sha256": "8e81af6dccd8d1b67619773f6af91bc583cdcada5eb8e78b689ca2b5d68fb292"
     },
     {
       "name": "@u-net/server",
-      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-server-2.0.0-rc.4.tgz",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-535a2f67b34a/u-net-server-2.0.0-rc.4.tgz",
       "sha256": "ab3d69163935316eb825a4d1adb04cf5bab2e5418a97402f6134730a67917f57"
     },
     {
       "name": "@u-net/web-login",
-      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-web-login-2.0.0-rc.4.tgz",
-      "sha256": "c3c284c5c6e47eeb2ae1a9e54a72ce3e277a02c28f1c141c5d8125db751d8cfe"
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-535a2f67b34a/u-net-web-login-2.0.0-rc.4.tgz",
+      "sha256": "f8afbfde653ea8a36cf482a23e24e97aba5326c46005277e478e298fc7f17163"
     },
     {
       "name": "@u-net/issuer",
-      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-75ae52d92c53/u-net-issuer-2.0.0-rc.4.tgz",
+      "path": "C:/Users/timis/Documents/Codex/2026-05-08/can-you-access-my-home-server/unet-sdk/artifacts/miniapp-rc4-535a2f67b34a/u-net-issuer-2.0.0-rc.4.tgz",
       "sha256": "4936de602d9d8478e42760037f4b88ff7f474cc8cfd7e97ec9b11eff781d4b70"
     }
   ],
   "source": {
     "baseCommit": "c2fd9905c4144efa01f75b82d66fa45fb93fbf08",
-    "sourceCommit": "75ae52d92c5336082f8a547e269fc18a578a3f72",
+    "sourceCommit": "535a2f67b34abf395011238f3300ab978c926ea5",
     "sourceState": "committed-intended-sdk-delta-over-rc3; not a registry release or clean CI attestation",
     "intendedCodeApiChanges": [
       {
@@ -46,6 +46,7 @@
         "changes": [
           "runMiniappLogin<Account extends MiniappLoginAccount>",
           "five callback adapters",
+          "third typed MiniappLoginApprovalContext argument carries original min(overall,challenge) deadline as expiresAtMs for native loginDeadlineMs",
           "exact approval/completion contracts",
           "mandatory completed:true ready acknowledgement",
           "fixed V1 readiness, native 64hex token and maximum 30-second future expiry",
@@ -66,7 +67,7 @@
     "intendedFiles": [
       {
         "path": ".changeset/pre/miniapp-launch-readiness.md",
-        "sha256": "4bd8fe1bc87368bf4905d8f872b13aff8ce4433e77122c4dc9c9a51346d8efed"
+        "sha256": "05e23b72c7d37395416debad2dfb20c0de92b3fd81ed926cbe49b61954aecf1b"
       },
       {
         "path": "package.json",
@@ -134,15 +135,15 @@
       },
       {
         "path": "packages/web-login/CHANGELOG.md",
-        "sha256": "b3a2ebcdbf85ece26092082ee8d1a7d722ba58e8c0b9bb8fbc8ddd8807634641"
+        "sha256": "aa3025c228d39ff8509fca5517b34b227be1ee787000cedbf3d8bc0984411569"
       },
       {
         "path": "packages/web-login/src/index.ts",
-        "sha256": "bf56e81bc3185e65a07a55947eff792efdce710773d38f356f636fd6cd35cbbb"
+        "sha256": "f4af600b70adea965ab26ef647ef86e43436a4054f54efd13faf5845013d1692"
       },
       {
         "path": "packages/web-login/src/miniappLogin.ts",
-        "sha256": "e12ee0295d9802f85bee63c469a5752ac7e3d69b0b16090653c7f36f727514d0"
+        "sha256": "204357854790a4f47c4728883046f2603d1ef3240e63e23c3c0e3ae6b47ed1c0"
       },
       {
         "path": "packages/web-login/src/index.test.ts",
@@ -150,15 +151,15 @@
       },
       {
         "path": "packages/web-login/src/miniappLogin.test.ts",
-        "sha256": "1a62e9d8613647094402991b454fced3aebfbbaf09e1812e88c08594a0ebae51"
+        "sha256": "f1d6798c026ee64d05049f1173cf4e9ec180b8bf5d5daad142163464b17a7127"
       },
       {
         "path": "packages/web-login/etc/web-login.api.md",
-        "sha256": "f7f519709e85cc6ca2e25b15ca8048d8cdc2b7ec38ef4fbecc07635bb5a86fa8"
+        "sha256": "4e9db310cfe3cfce5928f6b2f7e13ffabc023eaccf53ddc0054eaed0bdb7e1f4"
       },
       {
         "path": "packages/web-login/README.md",
-        "sha256": "77317196cd8a13b7c01533345b05ed524f9e7bb7c464ea8da60ed49e06637092"
+        "sha256": "254a21f1226aa46e3809516263247f96ef049e21c70a85610aab9f1ee888c91a"
       },
       {
         "path": "packages/server/src/serviceManifest.ts",
@@ -178,11 +179,11 @@
       },
       {
         "path": "docs/guides/miniapp-ready.md",
-        "sha256": "def1e3f7708f5b59eccc170460a4d1e85300f55e8a4d30cae72cca0ee4dc21d5"
+        "sha256": "f29ec9a2c4643c7117579e2b4bc00e35f86ec71d895356240095a41a093844fc"
       },
       {
         "path": "docs/changelog.md",
-        "sha256": "b06b22111a49d85af2c91520c56778342c855e1e6faa7b699695151379435fb0"
+        "sha256": "8ebe20984a29f44ce83afa17f53af25d994bd2d4594840d84f91a95c67f9b731"
       },
       {
         "path": "scripts/write-release-manifest.mjs",
@@ -194,7 +195,7 @@
       },
       {
         "path": "scripts/check-miniapp-candidate.mjs",
-        "sha256": "7bcab5dde228fec188b60fa5fd58b5b2648a068f64974960f4eabe3f1900989a"
+        "sha256": "57a4a486a43816dbd748df9d308546589bebc794838ee794b86e490d306610a7"
       }
     ],
     "preExistingExcludedPaths": [
@@ -205,8 +206,9 @@
   },
   "validationBoundary": "Core four tarballs passed packed runtime smoke. Supplemental issuer: packed metadata/version/range/inventory/hash and workspace typecheck checked; no new issuer behavior or broad issuer release campaign.",
   "packing": {
-    "consecutivePacks": 2,
-    "allFiveHashesIdentical": true,
+    "webLoginConsecutivePacks": 2,
+    "webLoginHashesIdentical": true,
+    "otherFourHashesUnchanged": true,
     "sourceMetadataEmbeddedInTarballs": false
   }
 }

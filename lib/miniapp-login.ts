@@ -12,7 +12,9 @@ export function runSupermarketMiniappLogin(
   return runMiniappLogin({
     origin, signal, timeoutMs: 60_000,
     createChallenge: createProviderChallenge,
-    approve: (challenge, stepSignal) => callHost<MiniappLoginApproval>('host.createServiceSession', { challenge }, stepSignal),
+    approve: (challenge, stepSignal, context) => callHost<MiniappLoginApproval>('host.createServiceSession', {
+      requestRef: challenge.requestRef, publicChallenge: challenge, loginDeadlineMs: context.expiresAtMs,
+    }, stepSignal),
     exchange: (challenge, stepSignal) => exchangeProviderChallenge(challenge.requestRef, stepSignal),
     initialize: async (exchanged, stepSignal) => {
       const authoritative = await readInitialAccountState(exchanged.scopedUserId, stepSignal);

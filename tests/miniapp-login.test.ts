@@ -17,17 +17,26 @@ test('supermarket service manifest advertises same-document launch readiness', a
   assert.equal(body.endpoints.exchange, `${body.origin}/api/unet/login/exchange`);
 });
 
-function harness(t: TestContext, change: { exchangeAccount?: string; stateAccount?: string; unavailable?: boolean; malformed?: boolean; deferred?: Promise<void>; ack?: unknown } = {}) {
+function harness(t: TestContext, change: { exchangeAccount?: string; stateAccount?: string; unavailable?: boolean; malformed?: boolean; deferred?: Promise<void>; ack?: unknown; challengeDelayMs?: number; challengeTtlMs?: number } = {}) {
   const calls: string[] = [];
   const completions: Record<string, unknown>[] = [];
   const installed: { scopedUserId: string; state: AccountState }[] = [];
+  const approvals: Record<string, unknown>[] = [];
+  const startedAtMs = Date.now();
+  let nowMs = startedAtMs;
+  t.mock.method(Date, 'now', () => nowMs);
+  const publicChallenge = { ...challenge, expiresAtIso: new Date(startedAtMs + (change.challengeTtlMs ?? 600_000)).toISOString() };
+  const expectedDeadlineMs = Math.min(startedAtMs + 60_000, Date.parse(publicChallenge.expiresAtIso));
   t.mock.method(globalThis, 'fetch', async (url: string, options: RequestInit) => {
     calls.push(url);
     assert.equal(options.credentials, 'same-origin');
     assert.equal(options.cache, 'no-store');
     assert.equal(options.redirect, 'error');
     assert.ok(options.signal instanceof AbortSignal);
-    if (url.endsWith('/challenge')) return Response.json({ success: true, challenge });
+    if (url.endsWith('/challenge')) {
+      nowMs += change.challengeDelayMs ?? 0;
+      return Response.json({ success: true, challenge: publicChallenge });
+    }
     if (url.endsWith('/exchange')) {
       assert.deepEqual(JSON.parse(options.body as string), { requestRef: challenge.requestRef });
       return Response.json({ success: true, scopedUserId: change.exchangeAccount ?? 'approved-account' });
@@ -42,7 +51,8 @@ function harness(t: TestContext, change: { exchangeAccount?: string; stateAccoun
   const host: SupermarketHostRequest = async <T>(action: string, payload: Record<string, unknown>): Promise<T> => {
     if (action === 'host.createServiceSession') {
       calls.push('approve');
-      assert.deepEqual(payload, { challenge });
+      assert.deepEqual(payload, { requestRef: challenge.requestRef, publicChallenge, loginDeadlineMs: expectedDeadlineMs });
+      approvals.push(payload);
       return { requestRef: challenge.requestRef, approved: true, scopedUserId: 'approved-account',
         launchReadiness: { version: 1, launchToken, expiresAtMs: Date.now() + 20_000 } } as T;
     }
@@ -51,11 +61,33 @@ function harness(t: TestContext, change: { exchangeAccount?: string; stateAccoun
     completions.push(payload);
     return (Object.hasOwn(change, 'ack') ? change.ack : { completed: true }) as T;
   };
-  return { calls, completions, installed, run: () => runSupermarketMiniappLogin(origin, host, new AbortController().signal, (scopedUserId, authoritative) => {
+  return { calls, completions, installed, approvals, expectedDeadlineMs, remainingAtApprovalMs: () => expectedDeadlineMs - nowMs,
+    run: () => runSupermarketMiniappLogin(origin, host, new AbortController().signal, (scopedUserId, authoritative) => {
     calls.push('install');
     installed.push({ scopedUserId, state: authoritative });
   }) };
 }
+
+test('native approval receives the original overall deadline after challenge creation consumes time', async t => {
+  const flow = harness(t, { challengeDelayMs: 17_000 });
+  await flow.run();
+  assert.equal(flow.approvals[0].loginDeadlineMs, flow.expectedDeadlineMs);
+  assert.equal(flow.remainingAtApprovalMs(), 43_000);
+});
+
+test('native approval deadline is also bounded by a shorter challenge expiry', async t => {
+  const flow = harness(t, { challengeTtlMs: 20_000, challengeDelayMs: 3_000 });
+  await flow.run();
+  assert.equal(flow.approvals[0].loginDeadlineMs, flow.expectedDeadlineMs);
+  assert.equal(flow.remainingAtApprovalMs(), 17_000);
+});
+
+test('challenge creation cannot exhaust the budget then start a new native approval window', async t => {
+  const flow = harness(t, { challengeDelayMs: 60_001 });
+  await assert.rejects(flow.run());
+  assert.equal(flow.approvals.length, 0);
+  assert.equal(flow.completions.length, 0);
+});
 
 test('initial cart and favorites use the exchanged ID and install before exact ready completion', async t => {
   const flow = harness(t);
